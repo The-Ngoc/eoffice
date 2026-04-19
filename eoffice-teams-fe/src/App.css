@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-copilot: #242424;
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --color-teams-purple: #6264A7;
+  --color-teams-dark: #242424;
+  --color-teams-bg: #F5F5F5;
+  --color-teams-sidebar: #EBEBEB;
+  --color-teams-border: #EDEBE9;
+  --color-text-main: #242424;
+  --color-text-secondary: #616161;
+  --accent-success: #107C10;
+  --accent-warning: #D83B01;
+  --background-copilot: linear-gradient(135deg, #A18CD1 0%, #FBC2EB 100%);
+}
+
+@layer base {
+  body {
+    @apply bg-teams-bg text-text-main font-sans antialiased;
+  }
+}
+
+@layer components {
+  .teams-card {
+    @apply bg-white border border-teams-border rounded-lg shadow-none transition-shadow duration-200;
+  }
+  
+  .teams-sidebar-item {
+    @apply flex flex-col items-center justify-center py-4 w-full cursor-pointer transition-colors duration-200 text-gray-500 border-l-2 border-transparent;
+  }
+  
+  .teams-sidebar-item.active {
+    @apply bg-white shadow-sm;
+    & .icon-bg { @apply bg-teams-purple text-white opacity-100; }
+  }
+  
+  .teams-sidebar-item:hover:not(.active) {
+    @apply bg-gray-100;
+  }
+
+  .icon-bg {
+    @apply w-8 h-8 rounded bg-[#D1D1D1] opacity-60 flex items-center justify-center transition-all;
+  }
+
+  .btn-primary {
+    @apply bg-teams-purple text-white px-3 py-1.5 rounded text-xs font-semibold hover:opacity-90 transition-opacity;
+  }
+
+  .copilot-card {
+    @apply relative bg-white border border-teams-border rounded-lg p-5 overflow-hidden;
+    &::before {
+      content: '';
+      @apply absolute top-0 left-0 right-0 h-1 bg-copilot;
+    }
+  }
+
+  .copilot-suggestion {
+    @apply bg-[#F8F7FF] border-l-4 border-[#A18CD1] p-3 rounded-r-sm text-sm mb-3;
+  }
+}
+
+/* Technical grid styles */
+.data-grid-header {
+  @apply grid grid-cols-12 gap-4 px-4 py-2 border-b border-teams-border text-[12px] font-semibold text-text-secondary;
+}
+
+.data-grid-row {
+  @apply grid grid-cols-12 gap-4 px-4 py-3 border-b border-[#F3F2F1] hover:bg-gray-50 cursor-pointer transition-colors text-sm items-center;
+}
+
