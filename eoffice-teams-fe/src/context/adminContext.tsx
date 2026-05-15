@@ -65,18 +65,18 @@ interface AdminContextType extends AdminState {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 const initialUsers: UserRecord[] = [
-  { id: '1', name: 'Nguyễn Văn A', email: 'vana@company.com', role: 'LanhDao', department: 'Hội đồng quản trị', status: 'Active', teamsStatus: 'Available' },
-  { id: '2', name: 'Trần Thị B', email: 'thib@company.com', role: 'VanThu', department: 'Hành chính', status: 'Active', teamsStatus: 'Busy' },
-  { id: '3', name: 'Lê Văn C', email: 'vanc@company.com', role: 'TruongPhong', department: 'Kế hoạch', status: 'Active', teamsStatus: 'Away' },
-  { id: '4', name: 'Phạm Văn D', email: 'vand@company.com', role: 'ChuyenVien', department: 'Kỹ thuật', status: 'Inactive', teamsStatus: 'Offline' },
+  { id: '1', name: 'Nguyễn Văn A', email: 'vana@company.com', role: 'LEADER', department: 'Hội đồng quản trị', status: 'Active', teamsStatus: 'Available' },
+  { id: '2', name: 'Trần Thị B', email: 'thib@company.com', role: 'CLERICAL', department: 'Hành chính', status: 'Active', teamsStatus: 'Busy' },
+  { id: '3', name: 'Lê Văn C', email: 'vanc@company.com', role: 'MANAGER', department: 'Kế hoạch', status: 'Active', teamsStatus: 'Away' },
+  { id: '4', name: 'Phạm Văn D', email: 'vand@company.com', role: 'SPECIALIST', department: 'Kỹ thuật', status: 'Inactive', teamsStatus: 'Offline' },
 ];
 
 const initialRolesConfig: RoleConfig[] = [
-  { role: 'LanhDao', permissions: ['1', '2', '3'] },
-  { role: 'VanThu', permissions: ['1', '4'] },
-  { role: 'TruongPhong', permissions: ['1', '2'] },
-  { role: 'ChuyenVien', permissions: ['1'] },
-  { role: 'QuanTri', permissions: ['1', '2', '3', '4', '5'] },
+  { role: 'LEADER', permissions: ['1', '2', '3'] },
+  { role: 'CLERICAL', permissions: ['1', '4'] },
+  { role: 'MANAGER', permissions: ['1', '2'] },
+  { role: 'SPECIALIST', permissions: ['1'] },
+  { role: 'ADMIN', permissions: ['1', '2', '3', '4', '5'] },
 ];
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -93,9 +93,9 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     { id: '2', user: 'Admin', action: 'Create User', target: 'Nguyễn Văn A', timestamp: '2024-03-20 09:30:00' },
   ]);
   const [workflows] = useState<WorkflowStep[]>([
-    { id: '1', name: 'Khởi tạo', approverRole: 'VanThu' },
-    { id: '2', name: 'Duyệt cấp phòng', approverRole: 'TruongPhong' },
-    { id: '3', name: 'Phê duyệt cuối', approverRole: 'LanhDao' },
+    { id: '1', name: 'Khởi tạo', approverRole: 'CLERICAL' },
+    { id: '2', name: 'Duyệt cấp phòng', approverRole: 'MANAGER' },
+    { id: '3', name: 'Phê duyệt cuối', approverRole: 'LEADER' },
   ]);
 
   const addUser = (user: Omit<UserRecord, 'id'>) => {

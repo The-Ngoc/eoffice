@@ -1,16 +1,12 @@
 
-import React, { useState } from 'react';
-import { Cell } from 'recharts';
+import React, { useEffect, useState } from 'react';
 import {
   Settings,
   Users as UsersIcon,
   ShieldCheck,
   Activity,
-  Menu,
   Plus,
   Search,
-  Filter,
-  MoreVertical,
   Edit2,
   Trash2,
   CheckCircle,
@@ -19,16 +15,19 @@ import {
   Clock,
   Calendar,
   Bot,
-  Bell,
   GitBranch
 } from 'lucide-react';
 import { User, Role } from '../../models/user';
-import { addUser } from '../../service/userService';
-import { useAdmin, UserRecord } from '../../context/adminContext';
-import { StatCard } from '../common/SharedComponents';
+import {
+  addUser as addUserApi,
+  deleteUserById,
+  getAllUsers,
+  updateUserRole,
+} from '../../service/userService';
+import { useAdmin } from '../../context/adminContext';
 import fakeData from '../../util/fake-data.json';
 import { AnimatePresence, motion } from 'motion/react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 
 type AdminTab = 'Overview' | 'Users' | 'RBAC' | 'Settings' | 'AuditLogs' | 'Workflow';
 
@@ -36,19 +35,51 @@ type AdminTab = 'Overview' | 'Users' | 'RBAC' | 'Settings' | 'AuditLogs' | 'Work
 export const AdminDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   const [activeTab, setActiveTab] = useState<AdminTab>('Overview');
-  const { users, rolesConfig, systemConfig, auditLogs, workflows, addUser, updateUser, deleteUser, updateSystemConfig } = useAdmin();
+  const { rolesConfig, systemConfig, auditLogs, workflows, updateSystemConfig } = useAdmin();
 
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
-  const overviewData = [
-    { name: 'Hoàn thành', value: 85, color: '#4CAF50' },
-    { name: 'Đang xử lý', value: 12, color: '#2196F3' },
-    { name: 'Quá hạn', value: 3, color: '#F44336' },
-  ];
+  const loadUsers = async () => {
+    try {
+      const users = await getAllUsers();
+      setAllUsers(users);
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách người dùng:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleAddUser = async (payload: User): Promise<User> => {
+    const created = await addUserApi(payload);
+    setAllUsers((current) => [created, ...current.filter((u) => u.id !== created.id)]);
+    return created;
+  };
+
+  const handleUpdateUserRole = async (id: string, role: Role): Promise<void> => {
+    const updated = await updateUserRole(id, role);
+    setAllUsers((current) => current.map((u) => (u.id === id ? { ...u, role: updated.role } : u)));
+  };
+
+  const handleDeleteUser = async (id: string): Promise<void> => {
+    await deleteUserById(id);
+    setAllUsers((current) => current.filter((u) => u.id !== id));
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'Overview': return <OverviewSection data={overviewData} users={users} />;
-      case 'Users': return <UserManagementSection users={users} onAdd={addUser} onUpdate={updateUser} onDelete={deleteUser} />;
+      // case 'Overview': return <OverviewSection data={overviewData} users={users} />;
+      case 'Users':
+        return (
+          <UserManagementSection
+            users={allUsers}
+            onAdd={handleAddUser}
+            onUpdate={handleUpdateUserRole}
+            onDelete={handleDeleteUser}
+          />
+        );
       case 'RBAC': return <RBACSection rolesConfig={rolesConfig} />;
       case 'Settings': return <SystemSettingsSection config={systemConfig} onUpdate={updateSystemConfig} />;
       case 'AuditLogs': return <AuditLogsSection logs={auditLogs} />;
@@ -56,6 +87,9 @@ export const AdminDashboard: React.FC<{ user: User }> = ({ user }) => {
       default: return null;
     }
   };
+
+
+
 
   return (
     <div className="flex bg-white rounded-lg border border-teams-border h-[calc(100vh-120px)] overflow-hidden shadow-sm">
@@ -93,58 +127,67 @@ const TabButton = ({ active, onClick, icon, label }: { active: boolean; onClick:
 
 // --- SECTIONS ---
 
-const OverviewSection = ({ data, users }: { data: any[], users: UserRecord[] }) => {
-  const onlineUsers = users.filter(u => u.teamsStatus === 'Available' || u.teamsStatus === 'Busy').length;
+// const OverviewSection = ({ data, users }: { data: any[], users: UserRecord[] }) => {
+//   const onlineUsers = users.filter(u => u.teamsStatus === 'Available' || u.teamsStatus === 'Busy').length;
 
-  return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold text-text-main">Thống kê tổng quan</h3>
-        <div className="flex space-x-2">
-          <span className="flex items-center space-x-1.5 text-xs font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span>{onlineUsers} Nhân sự đang Online</span>
-          </span>
-        </div>
-      </div>
+//   return (
+//     <div className="space-y-8">
+//       <div className="flex justify-between items-center">
+//         <h3 className="text-xl font-bold text-text-main">Thống kê tổng quan</h3>
+//         <div className="flex space-x-2">
+//           <span className="flex items-center space-x-1.5 text-xs font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+//             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+//             <span>{onlineUsers} Nhân sự đang Online</span>
+//           </span>
+//         </div>
+//       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Tổng người dùng" value={users.length.toString()} trend="+4 tháng này" />
-        <StatCard title="Văn bản đã ký" value="1,280" trend="+12%" />
-        <StatCard title="Thời gian xử lý TB" value="4.5h" trend="-15%" color="text-blue-600" />
-      </div>
+//       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+//         <StatCard title="Tổng người dùng" value={users.length.toString()} trend="+4 tháng này" />
+//         <StatCard title="Văn bản đã ký" value="1,280" trend="+12%" />
+//         <StatCard title="Thời gian xử lý TB" value="4.5h" trend="-15%" color="text-blue-600" />
+//       </div>
 
-      <div className="teams-card p-6">
-        <h4 className="font-bold text-sm text-text-secondary uppercase mb-6 tracking-wider">Tỷ lệ hoàn thành công việc hệ thống</h4>
-        <div className="h-75">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E1DFDD" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#616161' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#616161' }} />
-              <Tooltip
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-              />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
-};
+//       <div className="teams-card p-6">
+//         <h4 className="font-bold text-sm text-text-secondary uppercase mb-6 tracking-wider">Tỷ lệ hoàn thành công việc hệ thống</h4>
+//         <div className="h-75">
+//           <ResponsiveContainer width="100%" height="100%">
+//             <BarChart data={data}>
+//               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E1DFDD" />
+//               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#616161' }} />
+//               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#616161' }} />
+//               <Tooltip
+//                 cursor={{ fill: 'transparent' }}
+//                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+//               />
+//               <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+//                 {data.map((entry, index) => (
+//                   <Cell key={`cell-${index}`} fill={entry.color} />
+//                 ))}
+//               </Bar>
+//             </BarChart>
+//           </ResponsiveContainer>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 
 const Roles: Role[] = ['ADMIN', 'LEADER', 'SPECIALIST', 'CLERICAL', 'MANAGER'];
 
 
-const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: UserRecord[], onAdd: any, onUpdate: any, onDelete: any }) => {
-  const [filter, setFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+const UserManagementSection = ({
+  users,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  users: User[];
+  onAdd: (payload: User) => Promise<User>;
+  onUpdate: (id: string, role: Role) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Teams Directory Search states
@@ -154,7 +197,6 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUserRole, setNewUserRole] = useState<Role>('SPECIALIST');
 
-  const filteredUsers = users.filter(u => {  });
 
   const handleTeamsSearch = () => {
     if (!teamsSearchEmail) return;
@@ -177,8 +219,7 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
       };
 
       try {
-        const savedUser = await addUser(payload);
-        onAdd(savedUser);
+        await onAdd(payload);
 
         setTeamsResult(null);          // Đóng khung kết quả tìm kiếm
         setTeamsSearchEmail('');       // Xóa trắng input email
@@ -191,6 +232,62 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
       }
     }
   };
+
+  const handleEdit = async (userId: string) => {
+    const currentUser = users.find((u) => u.id === userId);
+    if (!currentUser) {
+      return;
+    }
+
+    const nextRoleRaw = window.prompt(
+      `Nhập role mới cho ${currentUser.fullName} (${Roles.join(', ')})`,
+      currentUser.role,
+    );
+
+    if (!nextRoleRaw) {
+      return;
+    }
+
+    const nextRole = nextRoleRaw.trim().toUpperCase() as Role;
+    if (!Roles.includes(nextRole)) {
+      window.alert('Role không hợp lệ.');
+      return;
+    }
+
+    try {
+      await onUpdate(userId, nextRole);
+    } catch (error) {
+      console.error('Lỗi: Không thể cập nhật role người dùng.', error);
+      window.alert('Không thể cập nhật role. Vui lòng thử lại.');
+    }
+  };
+
+  const handleDelete = async (userId: string) => {
+    const isConfirmed = window.confirm('Bạn có chắc chắn muốn xóa người dùng này không?');
+    if (!isConfirmed) {
+      return;
+    }
+
+    try {
+      await onDelete(userId);
+    } catch (error) {
+      console.error('Lỗi: Không thể xóa người dùng.', error);
+      window.alert('Không thể xóa người dùng. Vui lòng thử lại.');
+    }
+  };
+
+  const filteredUsers = users.filter((u) => {
+    const keyword = searchTerm.trim().toLowerCase();
+    if (!keyword) {
+      return true;
+    }
+
+    return (
+      u.fullName.toLowerCase().includes(keyword)
+      || u.email?.toLowerCase().includes(keyword)
+      || u.role.toLowerCase().includes(keyword)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -285,7 +382,7 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex space-x-2">
+        {/* <div className="flex space-x-2">
           <button
             onClick={() => setFilter('All')}
             className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${filter === 'All' ? 'bg-teams-purple text-white border-teams-purple' : 'bg-white text-text-secondary border-teams-border'}`}
@@ -304,7 +401,7 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
           >
             Ngưng hoạt động
           </button>
-        </div>
+        </div> */}
       </div>
 
       <div className="overflow-hidden border border-teams-border rounded-lg shadow-sm bg-white">
@@ -313,23 +410,24 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
             <tr>
               <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase">Người dùng</th>
               <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase">Vai trò / Phòng ban</th>
-              <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase text-center">Trạng thái</th>
+              {/* <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase text-center">Trạng thái</th> */}
               <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-teams-border">
 
             {/* Hiển thị danh sách người dùng đã lọc */}
+
             {filteredUsers.map(u => (
               <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-9 h-9 bg-teams-purple/10 text-teams-purple font-bold flex items-center justify-center rounded-full text-sm border border-teams-purple/20 shadow-sm transition-transform hover:scale-105">
-                      {u.name.split(' ').pop()?.charAt(0)}
+                      {u.fullName.split(' ').pop()?.charAt(0)}
                     </div>
                     <div>
                       <p className="font-bold text-sm text-text-main flex items-center space-x-1.5">
-                        <span>{u.name}</span>
+                        <span>{u.fullName}</span>
                       </p>
                       <p className="text-[11px] text-text-secondary font-medium mt-0.5">{u.email}</p>
                     </div>
@@ -337,29 +435,31 @@ const UserManagementSection = ({ users, onAdd, onUpdate, onDelete }: { users: Us
                 </td>
 
                 <td className="px-6 py-4">
-                  <p className="font-bold text-xs text-teams-purple">{u.role}</p>
-                  <p className="text-[11px] text-text-secondary font-medium mt-0.5">{u.department}</p>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${u.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                    {u.status === 'Active' ? 'Hoạt động' : 'Đã khóa'}
-                  </span>
-                </td>
+                    <p className="font-bold text-xs text-teams-purple">{u.role}</p>
+                    {/* <p className="text-[11px] text-text-secondary font-medium mt-0.5">{u.}</p> */}
+                  </td>
+
+                {/* <td className="px-6 py-4 text-center">
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${u.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      {u.status === 'Active' ? 'Hoạt động' : 'Đã khóa'}
+                    </span>
+                  </td> */}
+
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end space-x-1">
-                    <button className="p-2 text-gray-400 hover:text-teams-purple hover:bg-teams-purple/5 rounded transition-all"><Edit2 size={16} /></button>
-                    <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
+                    <button   onClick={() => handleEdit(u.id)} className="p-2 text-gray-400 hover:text-teams-purple hover:bg-teams-purple/5 rounded transition-all">
+                      <Edit2 size={16} />
+                    </button>
+                    <button   onClick={() => handleDelete(u.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
+
           </tbody>
         </table>
-        {filteredUsers.length === 0 && (
-          <div className="p-12 text-center">
-            <p className="text-sm text-text-secondary italic">Không tìm thấy người dùng phù hợp.</p>
-          </div>
-        )}
       </div>
     </div>
   );

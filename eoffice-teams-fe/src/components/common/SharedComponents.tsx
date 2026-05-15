@@ -78,3 +78,22 @@ export function HealthBar({ label, value, color }: { label: string, value: numbe
     </div>
   );
 }
+
+export function InteractiveProgressBar({ value, onChange }: { value: number, onChange: (v: number) => void }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-xs font-bold text-gray-600">
+        <span>Tiến độ công việc</span>
+        <span className="text-teams-purple">{value}%</span>
+      </div>
+      <input 
+        type="range" 
+        min="0" 
+        max="100" 
+        value={value} 
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teams-purple"
+      />
+    </div>
+  );
+}

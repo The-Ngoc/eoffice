@@ -6,19 +6,19 @@ export const TEAMS_BG = '#F5F5F5';
 export const TEAMS_DARK = '#242424';
 
 export const ROLES: { value: Role; label: string; description: string }[] = [
-  { value: 'VanThu', label: 'Văn thư', description: 'Tiếp nhận, bóc tách và lưu trữ văn bản' },
-  { value: 'LanhDao', label: 'Lãnh đạo', description: 'Phê duyệt, chỉ đạo và theo dõi KPI' },
-  { value: 'TruongPhong', label: 'Trưởng phòng', description: 'Quản lý task, phân công chuyên viên' },
-  { value: 'ChuyenVien', label: 'Chuyên viên', description: 'Xử lý hồ sơ, soạn thảo văn bản' },
-  { value: 'QuanTri', label: 'Quản trị', description: 'Quản lý người dùng và hệ thống' },
+  { value: 'CLERICAL', label: 'Văn thư', description: 'Tiếp nhận, bóc tách và lưu trữ văn bản' },
+  { value: 'LEADER', label: 'Lãnh đạo', description: 'Phê duyệt, chỉ đạo và theo dõi KPI' },
+  { value: 'MANAGER', label: 'Trưởng phòng', description: 'Quản lý task, phân công chuyên viên' },
+  { value: 'SPECIALIST', label: 'Chuyên viên', description: 'Xử lý hồ sơ, soạn thảo văn bản' },
+  { value: 'ADMIN', label: 'Quản trị', description: 'Quản lý người dùng và hệ thống' },
 ];
 
 export const MOCK_USERS: Record<Role, User> = {
-  VanThu: { id: 'u1', name: 'Nguyễn Văn Thư', role: 'VanThu', avatar: 'https://i.pravatar.cc/150?u=vanthu', email: 'vanthu@eoffice.com' },
-  LanhDao: { id: 'u2', name: 'Trần Lãnh Đạo', role: 'LanhDao', avatar: 'https://i.pravatar.cc/150?u=lanhdao', email: 'director@eoffice.com' },
-  TruongPhong: { id: 'u3', name: 'Lê Trưởng Phòng', role: 'TruongPhong', avatar: 'https://i.pravatar.cc/150?u=manager', email: 'manager@eoffice.com' },
-  ChuyenVien: { id: 'u4', name: 'Phạm Chuyên Viên', role: 'ChuyenVien', avatar: 'https://i.pravatar.cc/150?u=staff', email: 'staff@eoffice.com' },
-  QuanTri: { id: 'u5', name: 'Bùi Quản Trị', role: 'QuanTri', avatar: 'https://i.pravatar.cc/150?u=admin', email: 'admin@eoffice.com' },
+  CLERICAL: { id: 'u1', name: 'Nguyễn Văn Thư', role: 'CLERICAL', avatar: 'https://i.pravatar.cc/150?u=vanthu', email: 'vanthu@eoffice.com' },
+  LEADER: { id: 'u2', name: 'Trần Lãnh Đạo', role: 'LEADER', avatar: 'https://i.pravatar.cc/150?u=lanhdao', email: 'director@eoffice.com' },
+  MANAGER: { id: 'u3', name: 'Lê Trưởng Phòng', role: 'MANAGER', avatar: 'https://i.pravatar.cc/150?u=manager', email: 'manager@eoffice.com' },
+  SPECIALIST: { id: 'u4', name: 'Phạm Chuyên Viên', role: 'SPECIALIST', avatar: 'https://i.pravatar.cc/150?u=staff', email: 'staff@eoffice.com' },
+  ADMIN: { id: 'u5', name: 'Bùi Quản Trị', role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', email: 'admin@eoffice.com' },
 };
 
 export const MOCK_TASKS: DocumentTask[] = [

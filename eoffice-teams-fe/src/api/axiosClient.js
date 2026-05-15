@@ -10,6 +10,17 @@ const axiosClient = axios.create({
 
 
 axiosClient.interceptors.request.use((config) => {
+  const userId = localStorage.getItem('eo_user_id');
+  const userRole = localStorage.getItem('eo_user_role');
+
+  if (userId) {
+    config.headers['x-user-id'] = userId;
+  }
+
+  if (userRole) {
+    config.headers['x-user-role'] = userRole;
+  }
+
   return config;
 });
 

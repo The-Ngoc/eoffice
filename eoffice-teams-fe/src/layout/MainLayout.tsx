@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SidebarItem, CopilotSuggestion } from '../components/common/SharedComponents';
 import { Role, User } from '../models/user';
+import { getAllUsers } from '../service/userService';
 
 
 interface MainLayoutProps {
@@ -22,6 +23,39 @@ interface MainLayoutProps {
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, currentRole }) => {
   const [isCopilotOpen, setIsCopilotOpen] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isUserListOpen, setIsUserListOpen] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setIsLoadingUsers(true);
+        const data = await getAllUsers();
+        setUsers(data);
+      } catch (error) {
+        console.error('Failed to load users', error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
+  }, [users]);
+
+  const handleSelectUser = (nextUserId: string) => {
+    if (!nextUserId || nextUserId === currentUser.id) {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('userId', nextUserId);
+    window.location.assign(nextUrl.toString());
+  };
 
   return (
     <div className="flex h-screen bg-teams-bg overflow-hidden font-sans">
@@ -31,6 +65,37 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, c
           <SidebarItem icon={<LayoutDashboard size={18} />} label="H.Động" active />
           <SidebarItem icon={<FileText size={18} />} label="Tài liệu" />
           <SidebarItem icon={<Users size={18} />} label="Phòng" />
+          <SidebarItem
+            icon={<Users size={18} />}
+            label="Đổi user"
+            onClick={() => setIsUserListOpen(!isUserListOpen)}
+            active={isUserListOpen}
+          />
+
+          {isUserListOpen && (
+            <div className="mx-2 p-2 rounded-lg border border-teams-border bg-white/90 space-y-2">
+              <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide px-1">
+                Chọn người dùng
+              </div>
+
+              <select
+                value={currentUser.id}
+                onChange={(event) => handleSelectUser(event.target.value)}
+                disabled={isLoadingUsers || sortedUsers.length === 0}
+                className="w-full rounded border border-teams-border px-2 py-1.5 text-[11px] text-text-main bg-white outline-none focus:border-teams-purple"
+                title="Chọn người dùng"
+              >
+                {isLoadingUsers && <option>Đang tải người dùng...</option>}
+                {!isLoadingUsers && sortedUsers.length === 0 && <option>Không có dữ liệu user</option>}
+                {!isLoadingUsers &&
+                  sortedUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.fullName} - {user.role}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
           <SidebarItem icon={<Settings size={18} />} label="Cài đặt" />
         </div>
 
