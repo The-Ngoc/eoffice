@@ -1,6 +1,11 @@
 const express = require('express');
-const routes = require('./routes/userRouter'); 
 const cors = require('cors');
+
+const userRoutes = require('./routes/userRouter');
+const documentRoutes = require('./routes/documentRouter');
+const leaderRoutes = require('./routes/leaderRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const managerRoutes = require('./routes/managerRoutes');
 
 const app = express();
 app.use(cors());
@@ -9,21 +14,35 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api', routes);
+app.use('/api', userRoutes);
+app.use('/api', documentRoutes);
+app.use('/api/leader', leaderRoutes);
+app.use('/api', workflowRoutes);
+app.use('/api/manager', managerRoutes);
 
-// Thêm đoạn này để debug xem Route có thực sự tồn tại không
-console.log("--- DANH SÁCH ROUTE ĐÃ ĐĂNG KÝ ---");
-routes.stack.forEach((r) => {
-    if (r.route) {
-        console.log(`Kiểm tra: GET /api${r.route.path}`);
-    }
-});
-console.log("---------------------------------");
 
-// Middleware xử lý lỗi tập trung (Optionally)
+
+
+// Middleware xử lý lỗi tập trung
 app.use((err, req, res, next) => {
-    res.status(500).json({ message: err.message });
+    const statusCode = Number.isInteger(err?.statusCode) ? err.statusCode : 500;
+    console.error('🔥 BACKEND ERROR:', err?.stack || err);
+
+    return res.status(statusCode).json({
+        success: false,
+        data: null,
+        message: err.message || 'Internal Server Error'
+    });
 });
+
+app.use((req, res) => {
+    return res.status(404).json({
+        success: false,
+        data: null,
+        message: 'Route not found'
+    });
+});
+
 
 
 
