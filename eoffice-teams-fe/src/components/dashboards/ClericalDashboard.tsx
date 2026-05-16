@@ -15,6 +15,8 @@ import {
   MoreVertical,
   Zap,
   AlertTriangle,
+  Eye,
+  DownloadCloud,
 } from 'lucide-react';
 
 import { User } from '../../models/user';
@@ -31,7 +33,9 @@ import {
   getAllDocuments,
   getDocumentById,
   submitDocumentToLeader,
+  updateStatus,
 } from '../../service/clericalService';
+import VerificationCode from '../common/VerificationCode';
 import { StatCard } from '../common/SharedComponents';
 
 export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
@@ -50,6 +54,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isLegalAlertAcknowledged, setIsLegalAlertAcknowledged] = useState(false);
 
   const [newDocForm, setNewDocForm] = useState<CreateDocumentPayload>({
     docNumber: '',
@@ -123,15 +129,14 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     [documents],
   );
 
-  const urgentCount = useMemo(
-    () => documents.filter((doc) => doc.urgency === 'Hỏa tốc').length,
+  const urgentCount = useMemo(() => documents.filter((doc) => doc.urgency === 'Hỏa tốc').length, [documents]);
+
+  const waitingPublishCount = useMemo(
+    () => documents.filter((doc) => doc.status === 'WAITING_PUBLISH').length,
     [documents],
   );
 
-  const completedCount = useMemo(
-    () => documents.filter((doc) => doc.status === 'COMPLETED').length,
-    [documents],
-  );
+  const publishedCount = useMemo(() => documents.filter((doc) => doc.status === 'PUBLISHED').length, [documents]);
 
   const displayFlow = useMemo(() => {
     if (!selectedDoc) {
@@ -148,6 +153,11 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       };
     });
   }, [selectedDoc]);
+
+  // Publish / verification state
+  const [showPublishVerification, setShowPublishVerification] = useState(false);
+  const [isPublishVerified, setIsPublishVerified] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleSelectDocument = async (id: string) => {
     setSelectedDocId(id);
@@ -176,6 +186,11 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       return;
     }
 
+    if (!isLegalAlertAcknowledged) {
+      setErrorMessage('Vui lòng xác nhận cảnh báo tính pháp lý trước khi tiếp nhận văn bản.');
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -188,6 +203,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       setSelectedDocId(created.id);
       setIsUploadModalOpen(false);
       setSelectedFiles([]);
+      setIsLegalAlertAcknowledged(false);
       setNewDocForm({
         docNumber: '',
         symbol: '',
@@ -272,6 +288,46 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  // Publish flow handlers
+  const handleStartPublishFlow = () => {
+    setShowPublishVerification(true);
+    setIsPublishVerified(false);
+    setErrorMessage(null);
+  };
+
+  const handleVerificationSuccess = () => {
+    setIsPublishVerified(true);
+    setErrorMessage(null);
+  };
+
+  const handlePublishCancel = () => {
+    setShowPublishVerification(false);
+    setIsPublishVerified(false);
+  };
+
+  const handlePublishConfirm = async () => {
+    if (!selectedDoc) return;
+    setIsPublishing(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await updateStatus(selectedDoc.id, 'PUBLISHED' as ClericalDocumentStatus);
+      const updated = response.data;
+
+      setDocuments((currentDocs) => currentDocs.map((d) => (d.id === updated.id ? updated : d)));
+      setSelectedDocId(updated.id);
+      setSuccessMessage('Văn bản đã được ban hành.');
+      setShowPublishVerification(false);
+      setIsPublishVerified(false);
+    } catch (error) {
+      setErrorMessage('Không thể ban hành văn bản. Vui lòng thử lại.');
+      console.error('Failed to publish document:', error);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const formatDateTime = (date: Date): string => {
     return date.toLocaleString('vi-VN', {
       day: '2-digit',
@@ -350,6 +406,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const canSubmitToLeader = selectedDoc?.status === 'INITIALIZED' || selectedDoc?.status === 'REJECTED';
   const selectedFileCount = selectedFiles.length;
 
+  const canPublish = selectedDoc?.status === 'WAITING_PUBLISH';
+
   return (
     <div className="max-w-400 mx-auto space-y-6">
       {errorMessage && (
@@ -381,7 +439,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
         <StatCard title="Chờ tiếp nhận" value={pendingCount.toString().padStart(2, '0')} color="text-teams-purple" />
         <StatCard title="Đang xử lý" value={processingCount.toString().padStart(2, '0')} color="text-blue-600" />
         <StatCard title="Văn bản hỏa tốc" value={urgentCount.toString().padStart(2, '0')} color="text-red-600" />
-        <StatCard title="Hoàn thành" value={completedCount.toString().padStart(2, '0')} color="text-green-600" />
+        <StatCard title="Chờ ban hành" value={waitingPublishCount.toString().padStart(2, '0')} color="text-green-600" />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-280px)]">
@@ -390,7 +448,9 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
           {/* Toolbar */}
           <div className="p-4 border-b border-teams-border flex flex-wrap gap-4 items-center justify-between bg-gray-50/50">
             <div className="flex bg-white rounded-md border border-teams-border p-0.5">
-              {(['All', 'INITIALIZED', 'WAITING_LEADER', 'PROCESSING', 'REJECTED', 'COMPLETED'] as const).map((tab) => (
+              {(
+                ['All', 'INITIALIZED', 'WAITING_LEADER', 'REJECTED', 'PROCESSING', 'WAITING_PUBLISH', 'PUBLISHED'] as const
+              ).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -400,17 +460,17 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                       : 'text-text-secondary hover:bg-gray-100'
                   }`}
                 >
-                  {tab === 'All'
-                    ? 'Tất cả'
-                    : tab === 'INITIALIZED'
-                      ? 'Khởi tạo'
-                      : tab === 'WAITING_LEADER'
-                        ? 'Chờ lãnh đạo duyệt'
-                        : tab === 'PROCESSING'
-                          ? 'Đang xử lý'
-                          : tab === 'REJECTED'
-                            ? 'Bị từ chối'
-                        : 'Hoàn thành'}
+                  {
+                    ({
+                      All: 'Tất cả',
+                      INITIALIZED: 'Khởi tạo',
+                      WAITING_LEADER: 'Chờ lãnh đạo duyệt',
+                      REJECTED: 'Bị từ chối',
+                      PROCESSING: 'Đang xử lý',
+                      WAITING_PUBLISH: 'Chờ ban hành',
+                      PUBLISHED: 'Đã ban hành',
+                    } as Record<string, string>)[tab]
+                  }
                 </button>
               ))}
             </div>
@@ -578,35 +638,101 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* PDF View Simulation */}
+                  {/* Attachments list (mock data for now) */}
                   <div className="pt-4">
-                    <div className="bg-gray-100 rounded aspect-4/5 flex items-center justify-center border border-teams-border shadow-inner group relative cursor-pointer overflow-hidden">
-                      <div className="text-center group-hover:scale-110 transition-transform duration-300">
-                        <FileText size={48} className="text-gray-300 mx-auto" />
-                        <p className="text-[10px] text-gray-400 font-bold mt-2">PREVIEW DOCUMENT</p>
-                      </div>
-                      <div className="absolute inset-0 bg-teams-purple/0 group-hover:bg-teams-purple/5 transition-all flex items-center justify-center">
-                        <button className="opacity-0 group-hover:opacity-100 bg-white shadow-md rounded-full p-3 transition-opacity">
-                          <Plus className="text-teams-purple" size={24} />
-                        </button>
-                      </div>
+                    <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <FileText size={14} /> Đính kèm
+                    </h4>
+                    <div className="space-y-2">
+                      {(selectedDoc ? [
+                        // If backend later provides attachments as URLs, use them. For now use mock samples.
+                        { name: 'Công văn - Mẫu.pdf', url: '#', type: 'pdf' },
+                        { name: 'Báo cáo.xlsx', url: '#', type: 'xlsx' },
+                        { name: 'Ảnh minh họa.jpg', url: '#', type: 'jpg' },
+                      ] : []).map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-teams-border bg-white px-3 py-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-8 w-8 rounded-full bg-teams-purple/10 flex items-center justify-center text-teams-purple shrink-0">
+                              <FileText size={16} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-text-main truncate">{file.name}</p>
+                              <p className="text-[10px] text-text-secondary">{file.type?.toUpperCase() ?? 'FILE'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button className="text-gray-500 hover:text-teams-purple flex items-center gap-2 text-xs">
+                              <Eye size={14} /> Xem
+                            </button>
+                            <a href={file.url} className="text-gray-500 hover:text-teams-purple flex items-center gap-2 text-xs" download>
+                              <DownloadCloud size={14} /> Tải
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                      {selectedDoc == null && <p className="text-xs text-text-secondary">Không có tệp đính kèm.</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Actions Bar */}
-                <div className="p-5 border-t border-teams-border bg-gray-50/30 flex flex-wrap gap-2">
-                  <button
-                    className="flex-1 bg-teams-purple text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-teams-purple/90 transition-all"
-                    onClick={isProcessing ? undefined : handleSubmitToLeader}
-                    disabled={isSaving || isWaitingLeader || (!canSubmitToLeader && !isProcessing)}
-                  >
-                    <Send size={14} />
-                    {isProcessing ? 'Xem chi tiết' : isWaitingLeader ? 'Đang chờ duyệt' : 'Trình GĐ'}
-                  </button>
-                  <button className="w-full bg-blue-50 text-blue-700 py-2 rounded text-xs font-bold flex items-center justify-center gap-2 border border-blue-100 hover:bg-blue-100 transition-all mt-1">
-                    <MessageCircle size={14} /> Chat Teams về VB này
-                  </button>
+                <div className="p-5 border-t border-teams-border bg-gray-50/30 flex flex-col gap-3">
+                  {canPublish ? (
+                    <div className="space-y-3">
+                      {!showPublishVerification && (
+                        <button
+                          className="w-full bg-teams-purple text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-teams-purple/90 transition-all"
+                          onClick={handleStartPublishFlow}
+                          disabled={isPublishing}
+                        >
+                          <Send size={14} /> Ký ban hành
+                        </button>
+                      )}
+
+                      {showPublishVerification && (
+                        <div className="bg-white p-3 rounded border border-teams-border">
+                          <VerificationCode
+                            expectedCode="123456"
+                            onSuccess={handleVerificationSuccess}
+                            onCancel={handlePublishCancel}
+                          />
+
+                          {isPublishVerified && (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                className="flex-1 bg-green-600 text-white py-2 rounded text-xs font-bold"
+                                onClick={handlePublishConfirm}
+                                disabled={isPublishing}
+                              >
+                                {isPublishing ? 'Đang ban hành...' : 'Ban hành'}
+                              </button>
+                              <button
+                                className="px-4 py-2 text-sm font-bold text-text-secondary border rounded"
+                                onClick={handlePublishCancel}
+                                disabled={isPublishing}
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="flex-1 bg-teams-purple text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-teams-purple/90 transition-all"
+                        onClick={isProcessing ? undefined : handleSubmitToLeader}
+                        disabled={isSaving || isWaitingLeader || (!canSubmitToLeader && !isProcessing)}
+                      >
+                        <Send size={14} />
+                        {isProcessing ? 'Xem chi tiết' : isWaitingLeader ? 'Đang chờ duyệt' : 'Trình GĐ'}
+                      </button>
+                      <button className="w-full md:w-48 bg-blue-50 text-blue-700 py-2 rounded text-xs font-bold flex items-center justify-center gap-2 border border-blue-100 hover:bg-blue-100 transition-all mt-1 md:mt-0">
+                        <MessageCircle size={14} /> Chat Teams về VB này
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ) : (
@@ -782,6 +908,20 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     placeholder="Tóm tắt ngắn gọn nội dung văn bản..."
                   ></textarea>
                 </div>
+
+                {/* Legal Alert Checkbox */}
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={isLegalAlertAcknowledged}
+                    onChange={(e) => setIsLegalAlertAcknowledged(e.target.checked)}
+                    className="w-4 h-4 rounded cursor-pointer"
+                  />
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                    <span className="text-sm font-semibold text-amber-900">Văn bản này có tính pháp lý</span>
+                  </div>
+                </label>
               </div>
 
               <div className="p-5 bg-gray-50 flex justify-end gap-3 border-t border-teams-border">
@@ -789,6 +929,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   onClick={() => {
                     setIsUploadModalOpen(false);
                     setSelectedFiles([]);
+                    setIsLegalAlertAcknowledged(false);
                   }}
                   className="px-4 py-2 text-sm font-bold text-text-secondary hover:underline"
                 >
@@ -832,7 +973,8 @@ function StatusChip({ status }: { status: ClericalDocumentStatus }) {
     WAITING_LEADER: 'bg-amber-50 text-amber-700 border-amber-100',
     PROCESSING: 'bg-blue-50 text-blue-700 border-blue-100',
     REJECTED: 'bg-red-50 text-red-600 border-red-200',
-    COMPLETED: 'bg-green-50 text-green-600 border-green-100',
+    WAITING_PUBLISH: 'bg-green-50 text-green-600 border-green-100',
+    PUBLISHED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   };
 
   const labels: Record<ClericalDocumentStatus, string> = {
@@ -840,7 +982,8 @@ function StatusChip({ status }: { status: ClericalDocumentStatus }) {
     WAITING_LEADER: 'Chờ lãnh đạo duyệt',
     PROCESSING: 'Đang xử lý',
     REJECTED: 'Bị từ chối',
-    COMPLETED: 'Hoàn thành',
+    WAITING_PUBLISH: 'Chờ ban hành',
+    PUBLISHED: 'Đã ban hành',
   };
 
   return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[status]}`}>{labels[status]}</span>;

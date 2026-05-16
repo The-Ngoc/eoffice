@@ -1,4 +1,11 @@
-export type ClericalDocumentStatus = 'INITIALIZED' | 'WAITING_LEADER' | 'PROCESSING' | 'REJECTED' | 'COMPLETED';
+
+export type ClericalDocumentStatus =
+  | 'INITIALIZED'
+  | 'WAITING_LEADER'
+  | 'PROCESSING'
+  | 'REJECTED'
+  | 'WAITING_PUBLISH'
+  | 'PUBLISHED';
 export type ClericalFlowStepStatus = 'Done' | 'Current' | 'Next';
 export type ClericalUrgency = 'Thường' | 'Khẩn' | 'Hỏa tốc';
 
@@ -87,8 +94,14 @@ const normalizeStatus = (status?: string): ClericalDocumentStatus => {
   ) {
     return 'WAITING_LEADER';
   }
-  if (normalized === 'COMPLETED') {
-    return 'COMPLETED';
+  // Backend previously returned "COMPLETED" for documents that are ready
+  // to be published. Map that to the new UI status 'WAITING_PUBLISH'.
+  if (normalized === 'COMPLETED' || normalized === 'WAITING_PUBLISH') {
+    return 'WAITING_PUBLISH';
+  }
+
+  if (normalized === 'PUBLISHED') {
+    return 'PUBLISHED';
   }
 
   if (normalized === 'PROCESSING') {
