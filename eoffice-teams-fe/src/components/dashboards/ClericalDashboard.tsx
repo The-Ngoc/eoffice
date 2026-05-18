@@ -55,18 +55,15 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [isLegalAlertAcknowledged, setIsLegalAlertAcknowledged] = useState(false);
-
   const [newDocForm, setNewDocForm] = useState<CreateDocumentPayload>({
-    docNumber: '',
+    documentNumber: '',
     symbol: '',
     title: '',
     sender: '',
-    status: 'INITIALIZED',
     urgency: 'Thường',
-    arrivalDate: new Date().toISOString(),
     type: 'Công văn',
-    isOverdue: false,
+    summary: '',
+    legalWarning: false,
   });
 
   const fetchDocuments = async () => {
@@ -181,13 +178,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleCreateDocument = async () => {
-    if (!newDocForm.docNumber || !newDocForm.symbol || !newDocForm.title || !newDocForm.sender) {
-      setErrorMessage('Vui lòng nhập đầy đủ Số hiệu, Ký hiệu, Trích yếu và Đơn vị gửi.');
-      return;
-    }
-
-    if (!isLegalAlertAcknowledged) {
-      setErrorMessage('Vui lòng xác nhận cảnh báo tính pháp lý trước khi tiếp nhận văn bản.');
+    if (!newDocForm.documentNumber || !newDocForm.symbol || !newDocForm.title || !newDocForm.sender || !newDocForm.summary) {
+      setErrorMessage('Vui lòng nhập đầy đủ: Số hiệu, Ký hiệu, Tiêu đề, Đơn vị gửi và Tóm tắt nội dung.');
       return;
     }
 
@@ -203,17 +195,16 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       setSelectedDocId(created.id);
       setIsUploadModalOpen(false);
       setSelectedFiles([]);
-      setIsLegalAlertAcknowledged(false);
+      setSuccessMessage(`Văn bản "${created.title}" đã được lưu thành công vào sổ văn bản.`);
       setNewDocForm({
-        docNumber: '',
+        documentNumber: '',
         symbol: '',
         title: '',
         sender: '',
-        status: 'INITIALIZED',
         urgency: 'Thường',
-        arrivalDate: new Date().toISOString(),
         type: 'Công văn',
-        isOverdue: false,
+        summary: '',
+        legalWarning: false,
       });
     } catch (error) {
       setErrorMessage('Không thể tạo mới văn bản. Vui lòng thử lại.');
@@ -638,18 +629,13 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Attachments list (mock data for now) */}
-                  <div className="pt-4">
+                  {/* Hien thi file dinh kem trong document */}
+                  {/* <div className="pt-4">
                     <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
                       <FileText size={14} /> Đính kèm
                     </h4>
                     <div className="space-y-2">
-                      {(selectedDoc ? [
-                        // If backend later provides attachments as URLs, use them. For now use mock samples.
-                        { name: 'Công văn - Mẫu.pdf', url: '#', type: 'pdf' },
-                        { name: 'Báo cáo.xlsx', url: '#', type: 'xlsx' },
-                        { name: 'Ảnh minh họa.jpg', url: '#', type: 'jpg' },
-                      ] : []).map((file, idx) => (
+                      {[].map((file, idx) => (
                         <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-teams-border bg-white px-3 py-2">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="h-8 w-8 rounded-full bg-teams-purple/10 flex items-center justify-center text-teams-purple shrink-0">
@@ -672,7 +658,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                       ))}
                       {selectedDoc == null && <p className="text-xs text-text-secondary">Không có tệp đính kèm.</p>}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Actions Bar */}
@@ -776,7 +762,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-5">
+              <div className="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
                 {/* File picker */}
                 <div
                   className="border-2 border-dashed border-teams-purple/30 rounded-lg p-8 text-center bg-teams-purple/5 hover:bg-teams-purple/10 transition-all cursor-pointer group"
@@ -844,8 +830,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Số hiệu</label>
                     <input
                       type="text"
-                      value={newDocForm.docNumber}
-                      onChange={(event) => setNewDocForm((current) => ({ ...current, docNumber: event.target.value }))}
+                      value={newDocForm.documentNumber}
+                      onChange={(event) => setNewDocForm((current) => ({ ...current, documentNumber: event.target.value }))}
                       className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
                       placeholder="123..."
                     />
@@ -900,10 +886,21 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Trích yếu nội dung</label>
-                  <textarea
+                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Tiêu đề</label>
+                  <input
+                    type="text"
                     value={newDocForm.title}
                     onChange={(event) => setNewDocForm((current) => ({ ...current, title: event.target.value }))}
+                    className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
+                    placeholder="Tiêu đề chính của văn bản..."
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Tóm tắt nội dung</label>
+                  <textarea
+                    value={newDocForm.summary}
+                    onChange={(event) => setNewDocForm((current) => ({ ...current, summary: event.target.value }))}
                     className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple h-24"
                     placeholder="Tóm tắt ngắn gọn nội dung văn bản..."
                   ></textarea>
@@ -913,8 +910,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <label className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-all">
                   <input
                     type="checkbox"
-                    checked={isLegalAlertAcknowledged}
-                    onChange={(e) => setIsLegalAlertAcknowledged(e.target.checked)}
+                    checked={newDocForm.legalWarning}
+                    onChange={(e) => setNewDocForm((current) => ({ ...current, legalWarning: e.target.checked }))}
                     className="w-4 h-4 rounded cursor-pointer"
                   />
                   <div className="flex items-center gap-2">
@@ -929,7 +926,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   onClick={() => {
                     setIsUploadModalOpen(false);
                     setSelectedFiles([]);
-                    setIsLegalAlertAcknowledged(false);
                   }}
                   className="px-4 py-2 text-sm font-bold text-text-secondary hover:underline"
                 >

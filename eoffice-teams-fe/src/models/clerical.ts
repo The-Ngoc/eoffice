@@ -66,15 +66,14 @@ export interface ClericalFlowStep {
 }
 
 export interface CreateDocumentPayload {
-  docNumber: string;
+  documentNumber: string;
   symbol: string;
   title: string;
   sender: string;
-  status?: ClericalDocumentStatus;
   urgency: ClericalUrgency;
-  arrivalDate: string;
   type: string;
-  isOverdue?: boolean;
+  summary: string;
+  legalWarning: boolean;
 }
 
 const normalizeStatus = (status?: string): ClericalDocumentStatus => {

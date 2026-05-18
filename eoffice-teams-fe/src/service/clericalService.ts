@@ -1,3 +1,4 @@
+import axios from 'axios';
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
 import {
@@ -36,40 +37,62 @@ export const createDocument = async (
   data: CreateDocumentPayload,
   files: File[] = [],
 ): Promise<ApiResponse<ClericalDocument>> => {
-  const response =
-    files.length > 0
-      ? await axiosClient.post(
-          ENDPOINTS.DOCUMENTS.ADD,
-          (() => {
-            const formData = new FormData();
+  try {
+    const response =
+      files.length > 0
+        ? await axiosClient.post(
+            ENDPOINTS.DOCUMENTS.ADD,
+            (() => {
+              const formData = new FormData();
 
-            Object.entries(data).forEach(([key, value]) => {
-              if (value === undefined || value === null) {
-                return;
-              }
+              Object.entries(data).forEach(([key, value]) => {
+                if (value === undefined || value === null) {
+                  return;
+                }
 
-              formData.append(key, String(value));
-            });
+                formData.append(key, String(value));
+              });
 
-            files.forEach((file) => {
-              formData.append('files', file);
-            });
+              files.forEach((file) => {
+                formData.append('files', file);
+              });
 
-            return formData;
-          })(),
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          },
-        )
-      : await axiosClient.post(ENDPOINTS.DOCUMENTS.ADD, data);
-  const payload = response.data as ApiResponse<ClericalDocumentDto>;
+              // 🔍 Debug log
+              console.log('📤 FormData entries:', {
+                fields: Object.entries(data),
+                filesCount: files.length,
+                fileNames: files.map((f) => `${f.name} (${f.size} bytes)`),
+              });
 
-  return {
-    ...payload,
-    data: mapClericalDocumentDto(payload.data),
-  };
+              return formData;
+            })(),
+            // 🔧 Fix: Không set headers khi gửi FormData - axios tự động handle
+          )
+        : await axiosClient.post(ENDPOINTS.DOCUMENTS.ADD, data);
+
+    // 🔍 Debug log
+    console.log('✅ Document created:', response.data);
+
+    const payload = response.data as ApiResponse<ClericalDocumentDto>;
+
+    return {
+      ...payload,
+      data: mapClericalDocumentDto(payload.data),
+    };
+  } catch (error) {
+    // 🔍 Debug error
+    if (axios.isAxiosError(error)) {
+      console.error('❌ API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      });
+    } else {
+      console.error('❌ Error:', error);
+    }
+    throw error;
+  }
 };
 
 // Send a document to Leader approval inbox and return the updated document.

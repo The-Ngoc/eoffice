@@ -25,7 +25,6 @@ import {
   updateUserRole,
 } from '../../service/userService';
 import { useAdmin } from '../../context/adminContext';
-import fakeData from '../../util/fake-data.json';
 import { AnimatePresence, motion } from 'motion/react';
 
 
@@ -201,12 +200,12 @@ const UserManagementSection = ({
   const handleTeamsSearch = () => {
     if (!teamsSearchEmail) return;
     setIsSearchingTeams(true);
-    // Simulate API Delay
+    // Search from real users list via API
     setTimeout(() => {
-      const found = fakeData.find(u => u.mail.toLowerCase() === teamsSearchEmail.toLowerCase());
+      const found = users.find(u => (u.email || '').toLowerCase() === teamsSearchEmail.toLowerCase());
       setTeamsResult(found || 'NotFound');
       setIsSearchingTeams(false);
-    }, 600);
+    }, 300);
   };
 
   const handleAddFromTeams = async () => {
