@@ -17,10 +17,6 @@ const DepartmentMember = sequelize.define('DepartmentMember', {
         type: DataTypes.STRING,
         allowNull: false,
         field: 'user_id'
-    },
-    role: {
-        type: DataTypes.STRING,
-        allowNull: true
     }
 }, {
     tableName: 'department_members',

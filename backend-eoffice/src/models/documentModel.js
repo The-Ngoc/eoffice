@@ -1,6 +1,6 @@
-const { DataTypes } = require('sequelize');
+﻿const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
-const { DOCUMENT_STATUS, PRIORITY, DOCUMENT_DIRECTION } = require('../constants/enums');
+const { DOCUMENT_STATUS, PRIORITY } = require('../constants/enums');
 
 const Document = sequelize.define('Document', {
     id: {
@@ -9,9 +9,10 @@ const Document = sequelize.define('Document', {
         primaryKey: true,
         allowNull: false
     },
-    docNumber: {
+    documentNumber: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        field: 'document_number'
     },
     symbol: {
         type: DataTypes.STRING,
@@ -29,20 +30,6 @@ const Document = sequelize.define('Document', {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    location: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    startTime: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        field: 'start_time'
-    },
-    endTime: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        field: 'end_time'
-    },
     status: {
         type: DataTypes.ENUM(Object.values(DOCUMENT_STATUS)),
         allowNull: false,
@@ -57,59 +44,20 @@ const Document = sequelize.define('Document', {
         type: DataTypes.ENUM(Object.values(PRIORITY)),
         allowNull: true
     },
-    direction: {
-        type: DataTypes.ENUM(Object.values(DOCUMENT_DIRECTION)),
-        allowNull: true,
-        defaultValue: DOCUMENT_DIRECTION.INBOUND
-    },
-    arrivalDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: false
-    },
     type: {
         type: DataTypes.STRING,
         allowNull: false
-    },
-    priority: {
-        type: DataTypes.STRING,
-        allowNull: true
     },
     summary: {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    content: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-    legalWarnings: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        field: 'legal_warnings'
-    },
-    attachments: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-    rejectReason: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-        field: 'reject_reason'
-    },
-    assignedDepartmentId: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        field: 'assigned_department_id'
-    },
-    isOverdue: {
+    // Cảnh báo pháp lý (kiểu boolean): true = có cảnh báo, false = không có cảnh báo
+    legalWarning: {
         type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
-    },
-    flow: {
-        type: DataTypes.JSON,
-        allowNull: false,
-        defaultValue: []
+        allowNull: true,
+        defaultValue: false,
+        field: 'legal_warning'
     }
 }, {
     tableName: 'documents',
@@ -117,11 +65,6 @@ const Document = sequelize.define('Document', {
 });
 
 Document.associate = (models) => {
-    Document.belongsTo(models.Department, {
-        foreignKey: 'assignedDepartmentId',
-        as: 'assignedDepartment'
-    });
-
     Document.hasMany(models.DocumentFlow, {
         foreignKey: 'documentId',
         as: 'flowHistories'
@@ -132,9 +75,14 @@ Document.associate = (models) => {
         as: 'tasks'
     });
 
-    Document.hasMany(models.Signature, {
+    Document.hasMany(models.DocumentFile, {
         foreignKey: 'documentId',
-        as: 'signatures'
+        as: 'files'
+    });
+
+    Document.hasMany(models.SignatureHistory, {
+        foreignKey: 'documentId',
+        as: 'signatureHistories'
     });
 };
 

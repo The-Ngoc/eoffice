@@ -1,11 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const db = require('./models');
 
 const userRoutes = require('./routes/userRouter');
 const documentRoutes = require('./routes/documentRouter');
 const leaderRoutes = require('./routes/leaderRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
 const managerRoutes = require('./routes/managerRoutes');
+const cloudinaryRoutes = require('./routes/cloudinaryRoutes');
+
 
 const app = express();
 app.use(cors());
@@ -13,12 +16,28 @@ app.use(cors());
 // Middleware
 app.use(express.json());
 
+//  Khởi tạo database và đồng bộ các model với database
+
+
+async function initializeDatabase() {
+    try {
+        await db.sequelize.sync({ alter: true });
+        console.log('✅ Tất cả bảng đã được tạo/cập nhật thành công');
+    } catch (error) {
+        console.error('❌ Lỗi khi khởi tạo database:', error.message);
+        process.exit(1);
+    }
+}
+
+initializeDatabase();
+
 // Routes
 app.use('/api', userRoutes);
 app.use('/api', documentRoutes);
 app.use('/api/leader', leaderRoutes);
 app.use('/api', workflowRoutes);
 app.use('/api/manager', managerRoutes);
+app.use('/api/cloudinary', cloudinaryRoutes);
 
 
 

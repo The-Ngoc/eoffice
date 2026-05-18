@@ -143,6 +143,33 @@ const SECURITY_LEVEL_DISPLAY = {
   SECRET: 'Tối mật'
 };
 
+// ============ FILE UPLOAD STATUS ============
+const FILE_UPLOAD_STATUS = {
+  PENDING: 'PENDING',           // Chờ upload (file chưa được gửi lên Cloudinary)
+  UPLOADING: 'UPLOADING',       // Đang upload (file đang được gửi)
+  UPLOADED: 'UPLOADED',         // Đã upload (file tải lên Cloudinary thành công)
+  FAILED: 'FAILED'              // Thất bại (upload thất bại, cần retry)
+};
+
+const FILE_UPLOAD_STATUS_DISPLAY = {
+  PENDING: 'Chờ upload',
+  UPLOADING: 'Đang upload',
+  UPLOADED: 'Đã upload',
+  FAILED: 'Thất bại'
+};
+
+// ============ SUPPORTED FILE TYPES ============
+const SUPPORTED_FILE_TYPES = {
+  PDF: 'application/pdf',           // Tài liệu PDF
+  PNG: 'image/png',                 // Hình ảnh PNG
+  JPG: 'image/jpeg',                // Hình ảnh JPEG
+  JPEG: 'image/jpeg',               // Hình ảnh JPEG (alias)
+  DOC: 'application/msword',        // Tài liệu Word
+  DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // Tài liệu Word mới
+  XLS: 'application/vnd.ms-excel',  // Bảng tính Excel
+  XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // Bảng tính Excel mới
+};
+
 // ============ VALIDATORS ============
 function isValidRole(role) {
   return Object.values(ROLES).includes(role);
@@ -195,5 +222,10 @@ module.exports = {
 
   // Security
   SECURITY_LEVEL,
-  SECURITY_LEVEL_DISPLAY
+  SECURITY_LEVEL_DISPLAY,
+
+  // File Upload
+  FILE_UPLOAD_STATUS,
+  FILE_UPLOAD_STATUS_DISPLAY,
+  SUPPORTED_FILE_TYPES
 };

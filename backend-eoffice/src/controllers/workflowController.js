@@ -45,8 +45,10 @@ async function updateDocumentStatus(req, res) {
 
 async function transferDocument(req, res) {
     try {
-        const data = await workflowService.transferDocument(req.body);
-        return sendSuccess(res, data, 'Chuyển văn bản thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ. Hãy sử dụng Manager API để tạo task.'
+        });
     } catch (error) {
         return sendError(res, error);
     }
@@ -54,8 +56,10 @@ async function transferDocument(req, res) {
 
 async function assignTasks(req, res) {
     try {
-        const data = await workflowService.assignTasks(req.body);
-        return sendSuccess(res, data, 'Phân rã task thành công', 201);
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ. Hãy sử dụng Manager API để tạo task.'
+        });
     } catch (error) {
         return sendError(res, error);
     }
@@ -63,8 +67,10 @@ async function assignTasks(req, res) {
 
 async function summarize(req, res) {
     try {
-        const data = await workflowService.summarizeDocument(req.body);
-        return sendSuccess(res, data, 'Tạo cấu trúc tóm tắt AI thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ.'
+        });
     } catch (error) {
         return sendError(res, error);
     }
@@ -72,8 +78,10 @@ async function summarize(req, res) {
 
 async function checkFormat(req, res) {
     try {
-        const data = await workflowService.checkFormat(req.body);
-        return sendSuccess(res, data, 'Tạo cấu trúc kiểm tra định dạng AI thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ.'
+        });
     } catch (error) {
         return sendError(res, error);
     }

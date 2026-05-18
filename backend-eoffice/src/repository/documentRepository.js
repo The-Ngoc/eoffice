@@ -1,32 +1,56 @@
 const Document = require('../models/documentModel');
+const DocumentFile = require('../models/documentFileModel');
 const DocumentFlow = require('../models/documentFlowModel');
 const { DOCUMENT_STATUS } = require('../constants/enums');
 
 async function findAllDocuments() {
     return Document.findAll({
+        include: [
+            {
+                model: DocumentFile,
+                as: 'files',
+                attributes: ['id', 'nameFile', 'url']
+            }
+        ],
         order: [['updatedAt', 'DESC']]
     });
 }
 
 async function findDocumentById(id) {
-    return Document.findByPk(id);
+    return Document.findByPk(id, {
+        include: [
+            {
+                model: DocumentFile,
+                as: 'files',
+                attributes: ['id', 'nameFile', 'url']
+            },
+            {
+                model: DocumentFlow,
+                as: 'flowHistories',
+                attributes: ['id', 'documentId', 'departmentId', 'status', 'action', 'processedAt', 'note'],
+                order: [['processedAt', 'DESC']]
+            }
+        ]
+    });
 }
 
-async function createDocument(payload) {
-    return Document.create(payload);
+async function createDocument(payload, options = {}) {
+    // Tạo document mới, hỗ trợ transaction option để đảm bảo tính toàn vẹn dữ liệu
+    return Document.create(payload, options);
 }
 
-async function updateDocumentById(id, payload) {
-    const document = await Document.findByPk(id);
+async function updateDocumentById(id, payload, options = {}) {
+    const document = await Document.findByPk(id, { transaction: options.transaction });
     if (!document) {
         return null;
     }
-    return document.update(payload);
+    return document.update(payload, options);
 }
 
-async function deleteDocumentById(id) {
+async function deleteDocumentById(id, options = {}) {
     return Document.destroy({
-        where: { id }
+        where: { id },
+        transaction: options.transaction
     });
 }
 
@@ -63,33 +87,31 @@ async function countDocumentsByStatus() {
     return counts;
 }
 
-async function appendFlowStep(id, step) {
-    const document = await Document.findByPk(id);
-    if (!document) {
-        return null;
-    }
-
-    const flow = Array.isArray(document.flow)
-        ? document.flow.map((item) => {
-            if (!item || typeof item !== 'object') return item;
-            return {
-                ...item,
-                status: 'Done'
-            };
-        })
-        : [];
-
-    flow.push({
-        ...step,
-        status: step?.status || 'Current'
-    });
-
-    await document.update({ flow });
-    return document.reload();
+async function createFlowHistory(payload, options = {}) {
+    return DocumentFlow.create(payload, options);
 }
 
-async function createFlowHistory(payload) {
-    return DocumentFlow.create(payload);
+// Thêm file đính kèm vào document, hỗ trợ transaction option để đảm bảo tính toàn vẹn dữ liệu
+async function addDocumentFile(documentId, fileName, url, options = {}) {
+    return DocumentFile.create({
+        documentId,
+        nameFile: fileName,
+        url
+    }, options);
+}
+
+async function deleteDocumentFile(fileId) {
+    return DocumentFile.destroy({
+        where: { id: fileId }
+    });
+}
+
+async function getDocumentFiles(documentId) {
+    return DocumentFile.findAll({
+        where: { documentId },
+        attributes: ['id', 'nameFile', 'url'],
+        order: [['createdAt', 'DESC']]
+    });
 }
 
 module.exports = {
@@ -99,6 +121,8 @@ module.exports = {
     updateDocumentById,
     deleteDocumentById,
     countDocumentsByStatus,
-    appendFlowStep,
-    createFlowHistory
+    createFlowHistory,
+    addDocumentFile,
+    deleteDocumentFile,
+    getDocumentFiles
 };

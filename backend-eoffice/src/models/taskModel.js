@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+﻿const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 const { TASK_STATUS, PRIORITY } = require('../constants/enums');
 
@@ -14,31 +14,22 @@ const Task = sequelize.define('Task', {
         allowNull: false,
         field: 'document_id'
     },
-    departmentId: {
+    memberId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        field: 'member_id'
+    },
+    assignerId: {
         type: DataTypes.STRING,
         allowNull: true,
-        field: 'department_id'
-    },
-    assigneeId: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        field: 'assignee_id'
+        field: 'assigner_id'
     },
     title: {
         type: DataTypes.STRING,
         allowNull: false
     },
-    parentId: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        field: 'parent_id'
-    },
     description: {
         type: DataTypes.TEXT,
-        allowNull: true
-    },
-    priority: {
-        type: DataTypes.STRING,
         allowNull: true
     },
     status: {
@@ -56,13 +47,14 @@ const Task = sequelize.define('Task', {
         allowNull: true,
         field: 'due_date'
     },
-    createdBy: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        field: 'created_by'
+    isOverdue: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        field: 'is_overdue'
     },
-    sender: {
-        type: DataTypes.STRING,
+    note: {
+        type: DataTypes.TEXT,
         allowNull: true
     }
 }, {
@@ -76,31 +68,19 @@ Task.associate = (models) => {
         as: 'document'
     });
 
-    Task.belongsTo(models.Department, {
-        foreignKey: 'departmentId',
-        as: 'department'
+    Task.belongsTo(models.DepartmentMember, {
+        foreignKey: 'memberId',
+        as: 'member'
     });
 
     Task.belongsTo(models.User, {
-        foreignKey: 'assigneeId',
-        as: 'assignee'
+        foreignKey: 'assignerId',
+        as: 'assigner'
     });
 
-    Task.belongsTo(models.User, {
-        foreignKey: 'createdBy',
-        as: 'creator'
-    });
-
-    Task.belongsTo(models.Task, {
-        foreignKey: 'parentId',
-        as: 'parentTask',
-        constraints: false
-    });
-
-    Task.hasMany(models.Task, {
-        foreignKey: 'parentId',
-        as: 'subTasks',
-        constraints: false
+    Task.hasMany(models.TaskFile, {
+        foreignKey: 'taskId',
+        as: 'files'
     });
 };
 

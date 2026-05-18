@@ -34,8 +34,10 @@ async function getAssignedTasks(req, res) {
 
 async function getSubTasks(req, res) {
     try {
-        const data = await managerService.getSubTasks(req.query, getRequester(req));
-        return sendSuccess(res, data, 'Lấy danh sách task con thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Subtasks không được hỗ trợ trong cấu trúc mới'
+        });
     } catch (error) {
         return sendError(res, error);
     }

@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/document/all', documentController.getAllDocuments);
 router.get('/document/stats/status', documentController.getDocumentStats);
 router.get('/document/:id', documentController.getDocumentById);
-router.post('/document/add', documentController.addDocument);
+router.post('/document/add', uploadDocumentFile.array('files'), documentController.addDocument);
 router.put('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentStatus);
 router.post('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentStatus);
 router.post('/document/submit-to-leader', documentController.submitToLeader);

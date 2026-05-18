@@ -40,7 +40,11 @@ exports.getDocumentById = async (req, res) => {
 
 exports.addDocument = async (req, res) => {
     try {
-        const document = await documentService.createDocument(req.body);
+        // Lấy files từ multer middleware - req.files chứa mảng các files được upload
+        const files = req.files || [];
+        
+        // Gọi service với payload và files để xử lý: upload lên Cloudinary + lưu vào database
+        const document = await documentService.createDocument(req.body, files);
         return sendSuccess(res, document, 'Tạo văn bản thành công', 201);
     } catch (error) {
         console.error('❌ Lỗi khi tạo văn bản:', error);
@@ -63,7 +67,8 @@ exports.submitToLeader = async (req, res) => {
         const actor = {
             id: req.user?.id || req.headers['x-user-id'] || req.headers['user-id'] || req.body?.userId || null,
             name: req.headers['x-user-name'] || req.body?.userName || 'Clerical',
-            role: req.user?.role || req.headers['x-user-role'] || 'CLERICAL'
+            role: req.user?.role || req.headers['x-user-role'] || 'CLERICAL',
+            departmentId: req.user?.departmentId || req.headers['x-department-id'] || req.body?.departmentId || null
         };
 
         const document = await documentService.submitDocumentToLeader(req.body, actor);

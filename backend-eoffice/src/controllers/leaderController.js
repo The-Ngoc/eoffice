@@ -47,14 +47,10 @@ async function reject(req, res) {
 
 async function assignDepartment(req, res) {
     try {
-        const { docId, deptId } = req.body;
-        const actor = {
-            id: req.user?.id || req.headers['x-user-id'] || req.headers['user-id'] || req.body?.userId || null,
-            name: req.headers['x-user-name'] || req.body?.userName || 'Leader'
-        };
-
-        const data = await leaderService.assignDepartmentToDocument(docId, deptId, actor);
-        return sendSuccess(res, data, 'Cập nhật phòng ban xử lý thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ. Hãy sử dụng Manager API để tạo task.'
+        });
     } catch (error) {
         return sendError(res, error);
     }
@@ -90,8 +86,10 @@ async function getStats(req, res) {
 
 async function getDeptPerformance(req, res) {
     try {
-        const data = await leaderService.getDeptPerformance();
-        return sendSuccess(res, data, 'Lấy hiệu suất phòng ban thành công');
+        return sendError(res, {
+            statusCode: 501,
+            message: 'Endpoint này không còn được hỗ trợ'
+        });
     } catch (error) {
         return sendError(res, error);
     }

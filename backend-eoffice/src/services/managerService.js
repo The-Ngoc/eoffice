@@ -1,5 +1,6 @@
 const managerRepository = require('../repository/managerRepository');
-const { DOCUMENT_STATUS, TASK_STATUS, PRIORITY } = require('../constants/enums');
+const { TASK_STATUS, PRIORITY } = require('../constants/enums');
+const { randomUUID } = require('crypto');
 
 function createError(message, statusCode = 400) {
     const error = new Error(message);
@@ -15,50 +16,70 @@ function normalizeRecord(record) {
     return record?.get ? record.get({ plain: true }) : record;
 }
 
-function mapAssignedDocumentAsTask(document) {
-    const item = normalizeRecord(document);
-    return {
-        id: item.id,
-        title: item.title,
-        priority: item.priority || 'Medium',
-        status: item.status,
-        deadline: item.endTime || item.arrivalDate || null,
-        assigneeId: null,
-        sender: item.sender,
-        createdAt: item.createdAt,
-        parentId: null,
-        departmentId: item.assignedDepartmentId || null,
-        type: item.type || null
-    };
-}
-
 function mapTask(task) {
     const item = normalizeRecord(task);
-    return {
+    
+    const response = {
         id: item.id,
         title: item.title,
-        priority: item.priority || 'Medium',
+        description: item.description || null,
+        priority: item.priority || PRIORITY.MEDIUM,
         status: item.status,
-        deadline: item.dueDate || null,
-        assigneeId: item.assigneeId,
-        sender: item.sender || item.createdBy || null,
-        createdAt: item.createdAt,
-        parentId: item.parentId || null,
-        departmentId: item.departmentId || null,
+        dueDate: item.dueDate || null,
         documentId: item.documentId || null,
-        attachments: []
+        memberId: item.memberId || null,
+        assignerId: item.assignerId || null,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt
     };
+
+    // Include member info if available
+    if (item.member) {
+        response.member = {
+            id: item.member.id,
+            departmentId: item.member.departmentId,
+            userId: item.member.userId,
+            user: item.member.user ? {
+                id: item.member.user.id,
+                fullName: item.member.user.fullName,
+                email: item.member.user.email
+            } : null
+        };
+    }
+
+    // Include document info if available
+    if (item.document) {
+        response.document = {
+            id: item.document.id,
+            documentNumber: item.document.documentNumber,
+            title: item.document.title
+        };
+    }
+
+    // Include files if available
+    if (item.files && Array.isArray(item.files)) {
+        response.files = item.files.map(f => ({
+            id: f.id,
+            nameFile: f.nameFile,
+            url: f.url
+        }));
+    }
+
+    return response;
 }
 
 function mapMember(member) {
     const item = normalizeRecord(member);
     return {
         id: item.id,
-        name: item.fullName,
-        role: item.role,
-        email: item.email,
-        avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(item.id)}`,
-        departmentId: item.departmentId || '',
+        departmentId: item.departmentId,
+        userId: item.userId,
+        user: item.user ? {
+            id: item.user.id,
+            fullName: item.user.fullName,
+            email: item.user.email,
+            role: item.user.role
+        } : null,
         completedTasks: item.completedTasks || 0,
         totalTasks: item.totalTasks || 0
     };
@@ -84,23 +105,8 @@ function ensureManagerScope(query = {}, user = {}) {
 
 async function getAssignedTasks(query = {}, user = {}) {
     const managerId = ensureManagerScope(query, user);
-    const departments = await getScopeDepartments(managerId);
-    const departmentIds = departments.map((item) => item.id);
-
-    const tasks = await managerRepository.findAssignedTasks({ managerId, departmentIds });
-    return tasks.map(mapTask);
-}
-
-async function getSubTasks(query = {}, user = {}) {
-    const managerId = ensureManagerScope(query, user);
-    const departments = await getScopeDepartments(managerId);
-    const departmentIds = departments.map((item) => item.id);
-
-    const tasks = await managerRepository.findSubTasks({
-        parentId: query.parentId || null,
-        departmentIds
-    });
-
+    
+    const tasks = await managerRepository.findAssignedTasks({ managerId });
     return tasks.map(mapTask);
 }
 
@@ -111,12 +117,12 @@ async function getMembers(query = {}, user = {}) {
 
     const statsMap = new Map();
     statsRows.forEach((row) => {
-        const current = statsMap.get(row.assigneeId) || { totalTasks: 0, completedTasks: 0 };
+        const current = statsMap.get(row.memberId) || { totalTasks: 0, completedTasks: 0 };
         current.totalTasks += 1;
         if (row.status === TASK_STATUS.DONE) {
             current.completedTasks += 1;
         }
-        statsMap.set(row.assigneeId, current);
+        statsMap.set(row.memberId, current);
     });
 
     return members.map((member) => {
@@ -131,29 +137,15 @@ async function getMembers(query = {}, user = {}) {
 
 async function assignTask(payload = {}, user = {}) {
     const title = pickValue(payload, 'title');
-    const assigneeId = pickValue(payload, 'assigneeId');
-    const parentId = pickValue(payload, 'parentId') || null;
+    const memberId = pickValue(payload, 'memberId');
+    const documentId = pickValue(payload, 'documentId');
 
-    if (!title || !assigneeId) {
-        throw createError('title và assigneeId là bắt buộc');
+    if (!title || !memberId) {
+        throw createError('title và memberId là bắt buộc');
     }
 
-    let parentTask = null;
-    if (parentId) {
-        parentTask = await managerRepository.findTaskById(parentId);
-        if (!parentTask) {
-            throw createError('parentId không tồn tại', 404);
-        }
-    }
-
-    const documentId = pickValue(payload, 'documentId') || parentTask?.documentId || null;
     if (!documentId) {
         throw createError('documentId là bắt buộc');
-    }
-
-    const assignee = await managerRepository.findUserById(assigneeId);
-    if (!assignee) {
-        throw createError('assigneeId không tồn tại', 400);
     }
 
     const document = await managerRepository.findDocumentById(documentId);
@@ -161,73 +153,30 @@ async function assignTask(payload = {}, user = {}) {
         throw createError('documentId không tồn tại', 404);
     }
 
-    const departmentId = pickValue(payload, 'departmentId') || parentTask?.departmentId || null;
-    if (departmentId) {
-        const department = await managerRepository.findDepartmentById(departmentId);
-        if (!department) {
-            throw createError('departmentId không tồn tại', 400);
-        }
-    }
-
-    let creatorId = user.id || pickValue(payload, 'createdBy') || null;
-    if (creatorId) {
-        const creator = await managerRepository.findUserById(creatorId);
-        if (!creator) {
-            creatorId = null;
-        } else {
-            creatorId = creator.id;
-        }
-    }
-
     const data = {
+        id: randomUUID(),
         documentId,
-        departmentId,
-        assigneeId,
+        memberId,
         title,
         description: pickValue(payload, 'description') || null,
         priority: pickValue(payload, 'priority') || PRIORITY.MEDIUM,
         status: pickValue(payload, 'status') || TASK_STATUS.TODO,
-        dueDate: pickValue(payload, 'deadline') || pickValue(payload, 'dueDate') || null,
-        createdBy: creatorId,
-        sender: pickValue(payload, 'sender') || null,
-        parentId
+        dueDate: pickValue(payload, 'dueDate') || null,
+        assignerId: user.id || null,
+        note: pickValue(payload, 'note') || null,
+        isOverdue: false
     };
 
     const task = await managerRepository.createTask(data);
     return mapTask(task);
 }
 
-async function updateTaskStatus(payload = {}) {
-    const taskId = pickValue(payload, 'taskId');
-    const status = pickValue(payload, 'status');
-
-    if (!taskId || !status) {
-        throw createError('taskId và status là bắt buộc');
-    }
-
-    const task = await managerRepository.updateTaskById(taskId, { status });
-    if (!task) {
-        throw createError('Không tìm thấy task', 404);
-    }
-
-    return mapTask(task);
-}
-
 async function getStats(query = {}, user = {}) {
     const managerId = ensureManagerScope(query, user);
-    const departments = await getScopeDepartments(managerId);
-    const departmentIds = departments.map((item) => item.id);
+    
+    const tasks = await managerRepository.findAssignedTasks({ managerId });
 
-    const [documents, tasks] = await Promise.all([
-        managerRepository.findAssignedTasks({ managerId, departmentIds }),
-        managerRepository.findSubTasks({ departmentIds })
-    ]);
-
-    const totalDocs = documents.length;
-    const pendingApprovals = documents.filter((doc) => {
-        return doc.status === DOCUMENT_STATUS.DRAFT || doc.status === DOCUMENT_STATUS.PENDING_LEADER;
-    }).length;
-
+    const totalTasks = tasks.length;
     const completedTasks = tasks.filter((task) => {
         return task.status === TASK_STATUS.DONE;
     });
@@ -245,13 +194,13 @@ async function getStats(query = {}, user = {}) {
             return total + Math.max(0, (updated - created) / (1000 * 60 * 60 * 24));
         }, 0) / completedTasks.length).toFixed(1));
 
-    const efficiency = tasks.length === 0
+    const efficiency = totalTasks === 0
         ? 0
-        : Number(((completedTasks.length / tasks.length) * 100).toFixed(1));
+        : Number(((completedTasks.length / totalTasks) * 100).toFixed(1));
 
     return {
-        totalDocs,
-        pendingApprovals,
+        totalTasks,
+        completedTasks: completedTasks.length,
         processingTime: `${processingTime} ngày`,
         efficiency
     };
@@ -259,9 +208,7 @@ async function getStats(query = {}, user = {}) {
 
 module.exports = {
     getAssignedTasks,
-    getSubTasks,
     getMembers,
     assignTask,
-    updateTaskStatus,
     getStats
 };

@@ -18,11 +18,6 @@ const DocumentFlow = sequelize.define('DocumentFlow', {
         allowNull: true,
         field: 'department_id'
     },
-    managerId: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        field: 'manager_id'
-    },
     status: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -55,11 +50,6 @@ DocumentFlow.associate = (models) => {
     DocumentFlow.belongsTo(models.Department, {
         foreignKey: 'departmentId',
         as: 'department'
-    });
-
-    DocumentFlow.belongsTo(models.User, {
-        foreignKey: 'managerId',
-        as: 'manager'
     });
 };
 

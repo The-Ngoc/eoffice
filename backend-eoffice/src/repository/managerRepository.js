@@ -4,6 +4,7 @@ const User = require('../models/userModel');
 const Department = require('../models/departmentModel');
 const Document = require('../models/documentModel');
 const DepartmentMember = require('../models/departmentMemberModel');
+const TaskFile = require('../models/taskFileModel');
 const { TASK_STATUS } = require('../constants/enums');
 
 function normalizeIds(ids = []) {
@@ -21,53 +22,89 @@ async function findDepartmentsByManager(managerId) {
     });
 }
 
+// Tìm các DepartmentMember liên kết tới manager
+async function findDepartmentMembersByManager(managerId) {
+    const departments = await findDepartmentsByManager(managerId);
+    const departmentIds = departments.map((item) => item.id);
 
-async function findAssignedTasks(filters = {}) {
-    const where = {
-        parentId: null
-    };
-
-    if (filters.managerId) {
-        where.assigneeId = filters.managerId;
+    if (!departmentIds.length) {
+        return [];
     }
 
-    const departmentIds = normalizeIds(filters.departmentIds);
-    if (departmentIds.length) {
-        where.departmentId = {
-            [Op.in]: departmentIds
-        };
-    }
-
-    return Task.findAll({
-        where,
-        order: [['createdAt', 'DESC']],
+    return DepartmentMember.findAll({
+        where: {
+            departmentId: {
+                [Op.in]: departmentIds
+            }
+        },
         raw: true
     });
 }
 
-async function findSubTasks(filters = {}) {
+async function findAssignedTasks(filters = {}) {
     const where = {};
-    where.parentId = {
-        [Op.ne]: null
-    };
 
-    const departmentIds = normalizeIds(filters.departmentIds);
-
-    if (departmentIds.length) {
-        where.departmentId = {
-            [Op.in]: departmentIds
-        };
+    // Get tasks for manager's scope
+    if (filters.managerId) {
+        const memberIds = await findDepartmentMembersByManager(filters.managerId);
+        if (memberIds.length) {
+            where.memberId = {
+                [Op.in]: memberIds.map(m => m.id)
+            };
+        } else {
+            return [];
+        }
     }
 
-    if (filters.parentId) {
-        where.parentId = filters.parentId;
+    const departmentIds = normalizeIds(filters.departmentIds);
+    if (departmentIds.length) {
+        // Lọc theo departmentId thông qua DepartmentMember
+        const members = await DepartmentMember.findAll({
+            where: {
+                departmentId: {
+                    [Op.in]: departmentIds
+                }
+            },
+            attributes: ['id'],
+            raw: true
+        });
+
+        where.memberId = {
+            [Op.in]: members.map(m => m.id)
+        };
     }
 
     return Task.findAll({
         where,
-        order: [['createdAt', 'DESC']],
-        raw: true
+        include: [
+            {
+                model: DepartmentMember,
+                as: 'member',
+                attributes: ['id', 'departmentId', 'userId'],
+                include: [{
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'fullName', 'email']
+                }]
+            },
+            {
+                model: Document,
+                as: 'document',
+                attributes: ['id', 'documentNumber', 'title']
+            },
+            {
+                model: TaskFile,
+                as: 'files',
+                attributes: ['id', 'nameFile', 'url']
+            }
+        ],
+        order: [['createdAt', 'DESC']]
     });
+}
+
+// Subtasks không còn (parentId bị xóa)
+async function findSubTasks(filters = {}) {
+    return [];
 }
 
 async function findMembersForManagerScope(managerId) {
@@ -112,22 +149,19 @@ async function findMembersForManagerScope(managerId) {
     });
 }
 
-async function findMemberTaskStats(userIds = []) {
-    const ids = normalizeIds(userIds);
+async function findMemberTaskStats(memberIds = []) {
+    const ids = normalizeIds(memberIds);
     if (!ids.length) {
         return [];
     }
 
     return Task.findAll({
         where: {
-            assigneeId: {
+            memberId: {
                 [Op.in]: ids
-            },
-            parentId: {
-                [Op.ne]: null
             }
         },
-        attributes: ['assigneeId', 'status'],
+        attributes: ['memberId', 'status'],
         raw: true
     });
 }
