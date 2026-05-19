@@ -29,7 +29,7 @@ async function initializeDatabase() {
     }
 }
 
-initializeDatabase();
+// initializeDatabase();
 
 // Routes
 app.use('/api', userRoutes);

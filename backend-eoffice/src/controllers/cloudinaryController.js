@@ -28,8 +28,10 @@ async function upload(req, res, next) {
 
         const results = [];
         for (const file of files) {
+            // Lấy đuôi mở rộng (nếu có)
+            const extension = file.originalname.match(/\.[^.]+$/) ? file.originalname.match(/\.[^.]+$/)[0] : '';
             const baseName = String(file.originalname || 'file').replace(/\.[^.]+$/, '');
-            const uniqueName = `${baseName}_${Date.now()}`;
+            const uniqueName = `${baseName}_${Date.now()}${extension}`;
 
             const uploaded = await cloudinaryService.uploadBufferToCloudinary(
                 file.buffer,

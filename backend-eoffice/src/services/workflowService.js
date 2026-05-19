@@ -120,8 +120,31 @@ async function updateDocumentStatus(id, payload) {
     return normalizeRecord(updated);
 }
 
+async function getDocumentFlowHistory(documentId) {
+    if (!documentId) {
+        throw createError('documentId là bắt buộc', 400);
+    }
+
+    const document = await Document.findByPk(documentId);
+    if (!document) {
+        throw createError('Không tìm thấy văn bản', 404);
+    }
+
+    const history = await DocumentFlow.findAll({
+        where: { documentId },
+        order: [['createdAt', 'ASC']]
+    });
+
+    return {
+        id: document.id,
+        document_id: document.id,
+        flow_history: history.map((item) => normalizeRecord(item))
+    };
+}
+
 module.exports = {
     getDocumentsForLeader,
     createDocument,
-    updateDocumentStatus
+    updateDocumentStatus,
+    getDocumentFlowHistory
 };

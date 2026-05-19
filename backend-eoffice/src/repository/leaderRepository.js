@@ -12,9 +12,7 @@ function normalizeStatusList(statusList = []) {
 async function findPendingDocuments() {
     return Document.findAll({
         where: {
-            status: {
-                [Op.in]: [DOCUMENT_STATUS.PENDING_LEADER, DOCUMENT_STATUS.APPROVED]
-            }
+            status: DOCUMENT_STATUS.PENDING_LEADER
         },
         include: [
             {
@@ -25,7 +23,7 @@ async function findPendingDocuments() {
             {
                 model: DocumentFlow,
                 as: 'flowHistories',
-                attributes: ['id', 'documentId', 'departmentId', 'userId', 'status', 'action', 'processedAt'],
+                attributes: ['id', 'documentId', 'departmentId', 'status', 'action', 'processedAt'],
                 order: [['processedAt', 'DESC']]
             }
         ],
@@ -44,7 +42,7 @@ async function findDocumentById(id) {
             {
                 model: DocumentFlow,
                 as: 'flowHistories',
-                attributes: ['id', 'documentId', 'departmentId', 'userId', 'status', 'action', 'processedAt', 'note'],
+                attributes: ['id', 'documentId', 'departmentId', 'status', 'action', 'processedAt', 'note'],
                 order: [['processedAt', 'DESC']]
             }
         ]

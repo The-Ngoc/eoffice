@@ -122,7 +122,6 @@ async function getDocumentById(id) {
 }
 
 async function createDocument(payload, files = []) {
-    // Kiểm tra các trường bắt buộc
     const errors = [];
 
     const requiredFields = ['title', 'sender', 'urgency', 'type'];
@@ -178,6 +177,15 @@ async function createDocument(payload, files = []) {
 
         // Tạo document mới trong database
         const created = await documentRepository.createDocument(normalizedPayload, { transaction });
+
+        // Ghi nhận luồng khởi tạo document ngay sau khi tạo thành công
+        await documentRepository.createFlowHistory({
+            documentId: created.id,
+            status: 'CREATE',
+            action: 'CREATED',
+            note: 'Document created',
+            processedAt: new Date()
+        }, { transaction });
 
         // Xử lý files nếu có
         let uploadedFiles = [];
@@ -354,6 +362,59 @@ async function getDocumentStats() {
     return documentRepository.countDocumentsByStatus();
 }
 
+async function getDocumentFiles(documentId) {
+    if (!documentId) {
+        throw createValidationError('id của văn bản là bắt buộc');
+    }
+    
+    // Kiểm tra văn bản có tồn tại không
+    const document = await documentRepository.findDocumentById(documentId);
+    if (!document) {
+        throw createNotFoundError('Văn bản không tồn tại');
+    }
+
+    const files = await documentRepository.getDocumentFiles(documentId);
+    
+    // Map data theo yêu cầu format của client
+    return files.map((file) => ({
+        id: file.id,
+        file_name: file.nameFile,
+        file_url: file.url
+    }));
+}
+
+async function getDocumentFlowHistory(documentId) {
+    if (!documentId) {
+        throw createValidationError('documentId là bắt buộc');
+    }
+
+    const document = await documentRepository.findDocumentById(documentId);
+    if (!document) {
+        throw createNotFoundError('Văn bản không tồn tại');
+    }
+
+    const flowHistory = await documentRepository.getDocumentFlowHistory(documentId);
+
+    return {
+        id: document.id,
+        document_id: document.id,
+        flow_history: flowHistory.map((item) => ({
+            id: item.id,
+            document_id: item.documentId,
+            department_id: item.departmentId,
+            status: item.status,
+            action: item.action,
+            note: item.note,
+            processed_at: item.processedAt,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
+        }))
+    };
+}
+    
+    // getDocumentFiles,
+    // getDocumentFlowHistory
+
 module.exports = {
     getAllDocuments,
     getDocumentById,
@@ -361,5 +422,6 @@ module.exports = {
     updateDocumentStatus,
     submitDocumentToLeader,
     deleteDocument,
-    getDocumentStats
+    getDocumentStats,
+    getDocumentFiles
 };

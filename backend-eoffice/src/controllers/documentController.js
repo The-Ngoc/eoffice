@@ -110,3 +110,21 @@ exports.extractAzureContent = async (req, res) => {
         return sendError(res, error);
     }
 };
+
+exports.getDocumentFiles = async (req, res) => {
+    try {
+        const idDocument = req.params.id_document;
+        const files = await documentService.getDocumentFiles(idDocument);
+
+        const normalizedFiles = files.map((file) => ({
+            id: file.id,
+            file_name: file.file_name,
+            file_url: file.file_url
+        }));
+
+        return sendSuccess(res, normalizedFiles, 'Lấy danh sách file đính kèm thành công');
+    } catch (error) {
+        console.error('❌ Lỗi khi lấy danh sách file:', error);
+        return sendError(res, error);
+    }
+};

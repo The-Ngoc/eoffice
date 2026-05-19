@@ -16,4 +16,7 @@ router.post('/document/extract-azure-content', uploadDocumentFile.single('file')
 router.delete('/document/delete', documentController.deleteDocument);
 router.post('/document/delete', documentController.deleteDocument);
 
+// Lấy danh sách file đính kèm
+router.get('/document/files/:id_document', documentController.getDocumentFiles);
+
 module.exports = router;

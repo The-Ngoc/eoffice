@@ -87,6 +87,16 @@ async function checkFormat(req, res) {
     }
 }
 
+async function getDocumentFlowHistory(req, res) {
+    try {
+        const { documentId } = req.params;
+        const data = await workflowService.getDocumentFlowHistory(documentId);
+        return sendSuccess(res, data, 'Lấy lịch sử luân chuyển văn bản thành công');
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 module.exports = {
     getDocuments,
     createDocument,
@@ -94,5 +104,6 @@ module.exports = {
     transferDocument,
     assignTasks,
     summarize,
-    checkFormat
+    checkFormat,
+    getDocumentFlowHistory
 };

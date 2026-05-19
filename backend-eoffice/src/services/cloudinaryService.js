@@ -33,6 +33,20 @@ function getUploadEndpoint() {
     return `${config.apiBaseUrl}`;
 }
 
+function getResourceTypeFromMimeType(mimeType) {
+    const normalized = String(mimeType || '').toLowerCase();
+
+    if (normalized === 'application/pdf') {
+        return 'raw';
+    }
+
+    if (normalized.startsWith('image/')) {
+        return 'image';
+    }
+
+    return 'raw';
+}
+
 async function uploadBufferToCloudinary(fileBuffer, fileName, options = {}) {
     try {
         const config = validateCloudinaryConfig();
@@ -45,30 +59,32 @@ async function uploadBufferToCloudinary(fileBuffer, fileName, options = {}) {
         const timestamp = Math.floor(Date.now() / 1000).toString();
         const folder = options.folder || config.folder;
         const dataUri = toDataUri(fileBuffer, mimeType);
+        const resourceType = getResourceTypeFromMimeType(mimeType);
 
-        // Build params for signature (excluding file, api_key, resource_type)
         const signatureParams = {
             timestamp
         };
-        // determine resource type for Cloudinary (image vs raw/auto)
-        const resourceType = mimeType && String(mimeType).startsWith('image/') ? 'image' : 'raw';
-        
+
         if (folder) {
             signatureParams.folder = folder;
         }
-        
+
         if (fileName) {
-            signatureParams.public_id = String(fileName).replace(/\.[^.]+$/, '');
+            if (resourceType === 'raw') {
+                signatureParams.public_id = String(fileName);
+            } else {
+                signatureParams.public_id = String(fileName).replace(/\.[^.]+$/, '');
+            }
             signatureParams.use_filename = 'true';
             signatureParams.unique_filename = 'false';
         }
-        
+
         if (config.uploadPreset) {
             signatureParams.upload_preset = config.uploadPreset;
         }
-        
+
         const signature = buildUploadSignature(signatureParams, config.apiSecret);
-        // Build body params (include all params for the request)
+
         const bodyParams = {
             ...signatureParams,
             api_key: config.apiKey,
@@ -77,7 +93,6 @@ async function uploadBufferToCloudinary(fileBuffer, fileName, options = {}) {
         };
 
         const body = new URLSearchParams(bodyParams);
-
         const uploadUrl = `${getUploadEndpoint()}/${resourceType}/upload`;
 
         const response = await axios.post(uploadUrl, body.toString(), {
@@ -87,7 +102,6 @@ async function uploadBufferToCloudinary(fileBuffer, fileName, options = {}) {
             maxBodyLength: Infinity,
             maxContentLength: Infinity
         });
-
 
         return {
             success: true,

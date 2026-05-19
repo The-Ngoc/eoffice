@@ -35,7 +35,6 @@ async function findDocumentById(id) {
 }
 
 async function createDocument(payload, options = {}) {
-    // Tạo document mới, hỗ trợ transaction option để đảm bảo tính toàn vẹn dữ liệu
     return Document.create(payload, options);
 }
 
@@ -75,7 +74,7 @@ async function countDocumentsByStatus() {
         total: 0
     };
 
-    statuses.forEach(item => {
+    statuses.forEach((item) => {
         const status = item.status;
         if (counts[status] !== undefined) {
             counts[status] = parseInt(item.count, 10);
@@ -91,7 +90,6 @@ async function createFlowHistory(payload, options = {}) {
     return DocumentFlow.create(payload, options);
 }
 
-// Thêm file đính kèm vào document, hỗ trợ transaction option để đảm bảo tính toàn vẹn dữ liệu
 async function addDocumentFile(documentId, fileName, url, options = {}) {
     return DocumentFile.create({
         documentId,
@@ -114,6 +112,14 @@ async function getDocumentFiles(documentId) {
     });
 }
 
+async function getDocumentFlowHistory(documentId) {
+    return DocumentFlow.findAll({
+        where: { documentId },
+        attributes: ['id', 'documentId', 'departmentId', 'status', 'action', 'note', 'processedAt', 'createdAt', 'updatedAt'],
+        order: [['createdAt', 'ASC']]
+    });
+}
+
 module.exports = {
     findAllDocuments,
     findDocumentById,
@@ -124,5 +130,6 @@ module.exports = {
     createFlowHistory,
     addDocumentFile,
     deleteDocumentFile,
-    getDocumentFiles
+    getDocumentFiles,
+    getDocumentFlowHistory
 };
