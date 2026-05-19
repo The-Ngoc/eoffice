@@ -1,4 +1,3 @@
-
 export type Role = 'ADMIN' | 'CLERICAL' | 'LEADER' | 'MANAGER' | 'SPECIALIST';
 
 export interface User {
@@ -8,6 +7,31 @@ export interface User {
   role: Role;
   avatar?: string;
   email?: string;
+}
+
+export interface DocumentAttachment {
+  id: string | number;
+  file_name: string;
+  file_url: string;
+}
+
+export interface DocumentFlowHistoryItem {
+  id: string;
+  documentId: string;
+  departmentId: string | null;
+  status: string;
+  action: string;
+  note: string | null;
+  processedAt?: string | Record<string, unknown> | null;
+  createdAt?: string | Record<string, unknown> | null;
+  updatedAt?: string | Record<string, unknown> | null;
+  managerId: string | null;
+}
+
+export interface DocumentFlowHistoryResponse {
+  id: string;
+  document_id: string;
+  flow_history: DocumentFlowHistoryItem[];
 }
 
 export interface DocumentTask {

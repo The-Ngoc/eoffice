@@ -15,8 +15,6 @@ import {
   MoreVertical,
   Zap,
   AlertTriangle,
-  Eye,
-  DownloadCloud,
 } from 'lucide-react';
 
 import { User } from '../../models/user';
@@ -27,16 +25,55 @@ import {
   ClericalUrgency,
   CreateDocumentPayload,
 } from '../../models/clerical';
+import { DocumentAttachment, DocumentFlowHistoryItem } from '../../types';
 import {
   createDocument,
   deleteDocument,
   getAllDocuments,
+  getDocumentAttachments,
   getDocumentById,
+  getDocumentFlowHistory,
   submitDocumentToLeader,
   updateStatus,
 } from '../../service/clericalService';
 import VerificationCode from '../common/VerificationCode';
 import { StatCard } from '../common/SharedComponents';
+
+const formatFlowHistoryDate = (value?: string | Record<string, unknown> | null): string => {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return '--';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const getFlowHistoryTimestamp = (item: DocumentFlowHistoryItem): number => {
+  const candidates = [item.createdAt, item.processedAt, item.updatedAt];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+      continue;
+    }
+
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getTime();
+    }
+  }
+
+  return 0;
+};
 
 export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [documents, setDocuments] = useState<ClericalDocument[]>([]);
@@ -53,6 +90,9 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [newDocForm, setNewDocForm] = useState<CreateDocumentPayload>({
@@ -133,7 +173,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     [documents],
   );
 
-  const publishedCount = useMemo(() => documents.filter((doc) => doc.status === 'PUBLISHED').length, [documents]);
 
   const displayFlow = useMemo(() => {
     if (!selectedDoc) {
@@ -151,7 +190,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     });
   }, [selectedDoc]);
 
-  // Publish / verification state
   const [showPublishVerification, setShowPublishVerification] = useState(false);
   const [isPublishVerified, setIsPublishVerified] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -253,11 +291,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       return;
     }
 
-    // if (selectedDoc.status === 'WAITING_LEADER') {
-    //   setErrorMessage('Văn bản đang chờ Lãnh đạo duyệt, không thể trình lặp lại.');
-    //   return;
-    // }
-
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -279,7 +312,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Publish flow handlers
   const handleStartPublishFlow = () => {
     setShowPublishVerification(true);
     setIsPublishVerified(false);
@@ -425,7 +457,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
-      {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard title="Chờ tiếp nhận" value={pendingCount.toString().padStart(2, '0')} color="text-teams-purple" />
         <StatCard title="Đang xử lý" value={processingCount.toString().padStart(2, '0')} color="text-blue-600" />
@@ -434,9 +465,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-280px)]">
-        {/* Left Side: Document List */}
         <div className="lg:w-2/3 flex flex-col bg-white rounded-lg border border-teams-border overflow-hidden">
-          {/* Toolbar */}
           <div className="p-4 border-b border-teams-border flex flex-wrap gap-4 items-center justify-between bg-gray-50/50">
             <div className="flex bg-white rounded-md border border-teams-border p-0.5">
               {(
@@ -487,7 +516,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* List/Table */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {isLoading ? (
               <div className="p-8 text-sm text-text-secondary">Đang tải danh sách văn bản...</div>
@@ -541,7 +569,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Right Side: Detail Panel */}
         <div className="lg:w-1/3 flex flex-col bg-white rounded-lg border border-teams-border shadow-sm overflow-hidden">
           <AnimatePresence mode="wait">
             {selectedDoc ? (
@@ -552,7 +579,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 exit={{ opacity: 0, x: 20 }}
                 className="flex flex-col h-full"
               >
-                {/* Panel Header */}
                 <div className="p-5 border-b border-teams-border bg-gray-50/30 flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-teams-purple/10 flex items-center justify-center rounded-lg">
@@ -575,11 +601,9 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </button>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
                   {isDetailLoading && <p className="text-xs text-text-secondary">Đang tải chi tiết...</p>}
 
-                  {/* AI Section */}
                   <div className="p-4 bg-teams-purple/5 rounded-lg border border-teams-purple/10">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -604,7 +628,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </p>
                   </div>
 
-                  {/* Activity Timeline */}
                   <div>
                     <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-4 flex items-center gap-2">
                       <History size={14} />
@@ -619,8 +642,14 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                             <span className="text-xs font-bold text-text-main">{step.action}</span>
                             <span className="text-[10px] text-gray-400">{step.time}</span>
                           </div>
-                            <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
-                            <span className="text-[10px] text-gray-400 mt-0.5">{step.status === 'Current' ? 'Đang thực hiện' : step.status === 'Done' ? 'Đã hoàn tất' : 'Chờ xử lý'}</span>
+                          <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
+                          <span className="text-[10px] text-gray-400 mt-0.5">
+                            {step.status === 'Current'
+                              ? 'Đang thực hiện'
+                              : step.status === 'Done'
+                                ? 'Đã hoàn tất'
+                                : 'Chờ xử lý'}
+                          </span>
                         </div>
                       ))}
                       {displayFlow.length === 0 && (
@@ -629,39 +658,55 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Hien thi file dinh kem trong document */}
-                  {/* <div className="pt-4">
-                    <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <FileText size={14} /> Đính kèm
-                    </h4>
-                    <div className="space-y-2">
-                      {[].map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-teams-border bg-white px-3 py-2">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-8 w-8 rounded-full bg-teams-purple/10 flex items-center justify-center text-teams-purple shrink-0">
-                              <FileText size={16} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-text-main truncate">{file.name}</p>
-                              <p className="text-[10px] text-text-secondary">{file.type?.toUpperCase() ?? 'FILE'}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button className="text-gray-500 hover:text-teams-purple flex items-center gap-2 text-xs">
-                              <Eye size={14} /> Xem
-                            </button>
-                            <a href={file.url} className="text-gray-500 hover:text-teams-purple flex items-center gap-2 text-xs" download>
-                              <DownloadCloud size={14} /> Tải
-                            </a>
-                          </div>
+                  <div className="pt-4 space-y-6">
+                    <div>
+                      <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <FileText size={14} /> Tệp đính kèm
+                      </h4>
+
+                      {isLoadingAttachments ? (
+                        <div className="flex items-center justify-center p-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teams-purple"></div>
+                          <span className="ml-2 text-sm text-gray-500">Đang tải tệp đính kèm...</span>
                         </div>
-                      ))}
-                      {selectedDoc == null && <p className="text-xs text-text-secondary">Không có tệp đính kèm.</p>}
+                      ) : attachmentError ? (
+                        <div className="p-3 bg-red-50 text-red-600 text-sm border border-red-100 rounded-lg">
+                          {attachmentError}
+                        </div>
+                      ) : attachments.length === 0 ? (
+                        <div className="p-4 bg-gray-50 text-gray-500 text-sm border border-gray-100 rounded-lg italic text-center">
+                          Không có tệp đính kèm
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {attachments.map((file) => (
+                            <a
+                              key={file.id}
+                              href={file.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group hover:bg-gray-50 text-left"
+                            >
+                              <div className="p-2 bg-blue-50 text-blue-500 rounded mr-3 group-hover:bg-teams-purple group-hover:text-white transition-colors">
+                                <FileText size={18} />
+                              </div>
+                              <div className="flex-1 overflow-hidden">
+                                <p
+                                  className="text-xs font-bold text-text-main truncate group-hover:text-teams-purple transition-colors"
+                                  title={file.file_name}
+                                >
+                                  {file.file_name}
+                                </p>
+                                <p className="text-[10px] text-gray-400 truncate">Nhấn để xem / tải về</p>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div> */}
+                  </div>
                 </div>
 
-                {/* Actions Bar */}
                 <div className="p-5 border-t border-teams-border bg-gray-50/30 flex flex-col gap-3">
                   {canPublish ? (
                     <div className="space-y-3">
@@ -733,7 +778,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Upload Modal (Simulation) */}
       <AnimatePresence>
         {isUploadModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -763,7 +807,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
 
               <div className="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
-                {/* File picker */}
                 <div
                   className="border-2 border-dashed border-teams-purple/30 rounded-lg p-8 text-center bg-teams-purple/5 hover:bg-teams-purple/10 transition-all cursor-pointer group"
                   onClick={openFilePicker}
@@ -906,7 +949,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   ></textarea>
                 </div>
 
-                {/* Legal Alert Checkbox */}
                 <label className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-all">
                   <input
                     type="checkbox"

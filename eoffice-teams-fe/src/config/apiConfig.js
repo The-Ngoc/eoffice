@@ -15,6 +15,8 @@ export const ENDPOINTS = {
     UPDATE_STATUS: '/api/document/update-status',
     SUBMIT_TO_LEADER: '/api/document/submit-to-leader',
     DELETE: '/api/document/delete',
+    FILES: '/api/document/files',
+    FLOW_HISTORY: '/api/document/flow-history',
   },
   LEADER: {
     WAITING_LEADER_DOCUMENTS: '/api/leader/documents/waiting-leader',

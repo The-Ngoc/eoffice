@@ -1,7 +1,7 @@
 /**
  * @type {import('tsup').Options}
  */
-module.exports = {
+export default {
   dts: true,
   minify: false,
   bundle: false,

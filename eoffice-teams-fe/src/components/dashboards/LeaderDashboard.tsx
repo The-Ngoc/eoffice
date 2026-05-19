@@ -22,9 +22,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '../../models/user';
-import { DocumentTask, Department, KPIStats, LeaderDeptPerformance } from '../../types';
+import { DocumentTask, Department, KPIStats, LeaderDeptPerformance, DocumentAttachment } from '../../types';
 import { StatCard, StatusBadge } from '../common/SharedComponents';
 import { leaderService } from '../../service/leaderService';
+import { getDocumentAttachments } from '../../service/clericalService';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, AreaChart, Area } from 'recharts';
 
 export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
@@ -45,23 +46,51 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [approvedDocId, setApprovedDocId] = useState<string | null>(null);
 
+  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (selectedDoc) {
+      const fetchAttachments = async () => {
+        setIsLoadingAttachments(true);
+        setAttachmentError(null);
+        try {
+          const files = await getDocumentAttachments(selectedDoc.id);
+          const filesArray = Array.isArray(files) ? files : ((files as any).data || []);
+          setAttachments(filesArray);
+        } catch (err) {
+          console.error('Failed to load attachments', err);
+          setAttachmentError('Không thể tải tệp đính kèm. Vui lòng thử lại.');
+        } finally {
+          setIsLoadingAttachments(false);
+        }
+      };
+      fetchAttachments();
+    } else {
+      setAttachments([]);
+      setAttachmentError(null);
+    }
+  }, [selectedDoc]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [docs, kpi, performance, depts] = await Promise.all([
+      //  kpi, performance 
+      const [docs, depts] = await Promise.all([
         leaderService.getPendingDocuments(),
-        leaderService.getLeaderStats(),
-        leaderService.getDeptPerformance(),
+        // leaderService.getLeaderStats(),
+        // leaderService.getDeptPerformance(),
         leaderService.getDepartments()
       ]);
       setPendingDocs(docs);
-      setStats(kpi);
-      setDeptPerformance(performance);
       setDepartments(depts);
+      // setStats(kpi);
+      // setDeptPerformance(performance);
     } catch (err) {
       console.error('Failed to load leader dashboard data', err);
     } finally {
@@ -330,29 +359,46 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                           </div>
                        </div>
 
-                       {/* Attachments (Mock) */}
+                       {/* Attachments */}
                        <div className="space-y-3">
                           <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Tệp đính kèm</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                             <div className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group">
-                                <div className="p-2 bg-red-50 text-red-500 rounded mr-3">
-                                   <FileText size={18} />
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                   <p className="text-xs font-bold text-text-main truncate">Ho-so-quyet-toan.pdf</p>
-                                   <p className="text-[10px] text-gray-400">4.5 MB • PDF</p>
-                                </div>
+                          
+                          {isLoadingAttachments ? (
+                             <div className="flex items-center justify-center p-4">
+                               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teams-purple"></div>
+                               <span className="ml-2 text-sm text-gray-500">Đang tải tệp đính kèm...</span>
                              </div>
-                             <div className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group">
-                                <div className="p-2 bg-blue-50 text-blue-500 rounded mr-3">
-                                   <Calendar size={18} />
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                   <p className="text-xs font-bold text-text-main truncate">Lich-trinh-thi-cong.xlsx</p>
-                                   <p className="text-[10px] text-gray-400">1.2 MB • Excel</p>
-                                </div>
+                          ) : attachmentError ? (
+                             <div className="p-3 bg-red-50 text-red-600 text-sm border border-red-100 rounded-lg">
+                               {attachmentError}
                              </div>
-                          </div>
+                          ) : attachments.length === 0 ? (
+                             <div className="p-4 bg-gray-50 text-gray-500 text-sm border border-gray-100 rounded-lg italic text-center">
+                               Không có tệp đính kèm
+                             </div>
+                          ) : (
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                               {attachments.map((file) => (
+                                 <a 
+                                   key={file.id}
+                                   href={file.file_url}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group hover:bg-gray-50 text-left"
+                                 >
+                                    <div className="p-2 bg-blue-50 text-blue-500 rounded mr-3 group-hover:bg-teams-purple group-hover:text-white transition-colors">
+                                       <FileText size={18} />
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                       <p className="text-xs font-bold text-text-main truncate group-hover:text-teams-purple transition-colors" title={file.file_name}>
+                                         {file.file_name}
+                                       </p>
+                                       <p className="text-[10px] text-gray-400 truncate">Nhấn để xem / tải về</p>
+                                    </div>
+                                 </a>
+                               ))}
+                             </div>
+                          )}
                        </div>
                     </div>
 
