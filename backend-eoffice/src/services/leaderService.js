@@ -1,4 +1,5 @@
 const leaderRepository = require('../repository/leaderRepository');
+const taskDepartmentRepository = require('../repository/taskDepartmentRepository');
 const { DOCUMENT_STATUS } = require('../constants/enums');
 
 const VALID_STATUSES = Object.values(DOCUMENT_STATUS);
@@ -177,6 +178,54 @@ async function rejectDocument(id, reason) {
     return normalizeDocument(updated);
 }
 
+async function assignDepartmentTask(payload = {}) {
+    const documentId = String(payload.docId || payload.documentId || '').trim();
+    const managerId = String(payload.managerId || '').trim();
+    const directionDescription = String(payload.directionDescription || '').trim();
+
+    if (!documentId) {
+        throw createValidationError('docId là bắt buộc');
+    }
+
+    if (!directionDescription) {
+        throw createValidationError('directionDescription là bắt buộc');
+    }
+
+    if (!managerId) {
+        throw createValidationError('managerId là bắt buộc');
+    }
+
+    const document = await leaderRepository.findDocumentById(documentId);
+    if (!document) {
+        throw createNotFoundError('Không tìm thấy văn bản');
+    }
+
+    const department = await leaderRepository.findDepartmentByManagerId(managerId);
+    if (!department) {
+        throw createNotFoundError('Không tìm thấy phòng ban của trưởng phòng');
+    }
+
+    const existingTask = await taskDepartmentRepository.findTaskDepartmentByDocumentAndManager(documentId, managerId);
+    if (existingTask) {
+        throw createValidationError('Task cho trưởng phòng này đã tồn tại');
+    }
+
+    const created = await taskDepartmentRepository.createTaskDepartment({
+        documentId,
+        managerId,
+        note: directionDescription
+    });
+
+    return {
+        id: created.id,
+        documentId: created.documentId,
+        managerId: created.managerId,
+        note: created.note,
+        directionDescription,
+        department: normalizeDepartment(department)
+    };
+}
+
 async function getDepartments() {
     const departments = await leaderRepository.findDepartments();
     return departments.map(normalizeDepartment);
@@ -241,10 +290,17 @@ async function getStats() {
     };
 }
 
+async function getApprovedDocuments() {
+    const documents = await leaderRepository.findDocumentsByStatusWithDetails([DOCUMENT_STATUS.APPROVED]);
+    return documents.map(normalizeDocument);
+}
+
 module.exports = {
     getPendingDocuments,
+    getApprovedDocuments,
     approveDocument,
     rejectDocument,
+    assignDepartmentTask,
     getDepartments,
     getDepartmentManager,
     getStats,

@@ -13,6 +13,7 @@ router.post('/documents/transfer', /* checkRole([ROLES.LEADER]), */ workflowCont
 router.post('/tasks/assign', /* checkRole([ROLES.MANAGER]), */ workflowController.assignTasks);
 router.post('/ai/summarize', /* checkRole([ROLES.LEADER, ROLES.MANAGER, ROLES.SPECIALIST]), */ workflowController.summarize);
 router.post('/ai/check-format', /* checkRole([ROLES.LEADER, ROLES.MANAGER, ROLES.SPECIALIST]), */ workflowController.checkFormat);
+
 router.get('/documents/:documentId/flow-history', workflowController.getDocumentFlowHistory);
 
 module.exports = router;

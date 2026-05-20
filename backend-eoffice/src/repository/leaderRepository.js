@@ -74,6 +74,14 @@ async function findDepartmentById(deptId) {
     return Department.findByPk(deptId);
 }
 
+async function findDepartmentByManagerId(managerId) {
+    return Department.findOne({
+        where: {
+            managerId
+        }
+    });
+}
+
 async function countDocuments() {
     return Document.count();
 }
@@ -102,6 +110,31 @@ async function findDocumentsByStatus(statusList) {
     });
 }
 
+async function findDocumentsByStatusWithDetails(statusList) {
+    const normalizedStatuses = normalizeStatusList(statusList);
+    return Document.findAll({
+        where: {
+            status: {
+                [Op.in]: normalizedStatuses
+            }
+        },
+        include: [
+            {
+                model: DocumentFile,
+                as: 'files',
+                attributes: ['id', 'nameFile', 'url']
+            },
+            {
+                model: DocumentFlow,
+                as: 'flowHistories',
+                attributes: ['id', 'documentId', 'departmentId', 'status', 'action', 'processedAt'],
+                order: [['processedAt', 'DESC']]
+            }
+        ],
+        order: [['updatedAt', 'DESC']]
+    });
+}
+
 async function createFlowHistory(payload) {
     return DocumentFlow.create(payload);
 }
@@ -112,8 +145,10 @@ module.exports = {
     updateDocumentStatus,
     findDepartments,
     findDepartmentById,
+    findDepartmentByManagerId,
     countDocuments,
     countDocumentsByStatus,
     findDocumentsByStatus,
+    findDocumentsByStatusWithDetails,
     createFlowHistory
 };

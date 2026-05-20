@@ -9,9 +9,14 @@ const router = express.Router();
 router.get('/documents/waiting-leader', /* checkRole([ROLES.LEADER]), */ leaderController.getWailtingLeader);
 router.get('/documents/pending', /* checkRole([ROLES.LEADER]), */ leaderController.getWailtingLeader);
 router.get('/documents/wailting-leader', /* checkRole([ROLES.LEADER]), */ leaderController.getWailtingLeader);
+router.get('/documents/approved', /* checkRole([ROLES.LEADER]), */ leaderController.getApprovedDocuments);
 router.post('/document/approve', /* checkRole([ROLES.LEADER]), */ leaderController.approve);
 router.post('/document/reject', /* checkRole([ROLES.LEADER]), */ leaderController.reject);
+
+//Ok
 router.post('/document/assign-department', /* checkRole([ROLES.LEADER]), */ leaderController.assignDepartment);
+
+
 router.get('/departments', /* checkRole([ROLES.LEADER, ROLES.MANAGER, ROLES.SPECIALIST]), */ leaderController.getDepartments);
 router.get('/department/manager/:deptId', /* checkRole([ROLES.LEADER, ROLES.MANAGER, ROLES.SPECIALIST]), */ leaderController.getDepartmentManager);
 router.get('/stats', /* checkRole([ROLES.LEADER]), */ leaderController.getStats);

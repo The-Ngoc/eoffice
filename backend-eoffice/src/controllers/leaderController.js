@@ -25,6 +25,15 @@ async function getWailtingLeader(req, res) {
     }
 }
 
+async function getApprovedDocuments(req, res) {
+    try {
+        const data = await leaderService.getApprovedDocuments();
+        return sendSuccess(res, data, 'Lấy danh sách văn bản đã duyệt thành công');
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 async function approve(req, res) {
     try {
         const { id } = req.body;
@@ -47,10 +56,8 @@ async function reject(req, res) {
 
 async function assignDepartment(req, res) {
     try {
-        return sendError(res, {
-            statusCode: 501,
-            message: 'Endpoint này không còn được hỗ trợ. Hãy sử dụng Manager API để tạo task.'
-        });
+        const data = await leaderService.assignDepartmentTask(req.body);
+        return sendSuccess(res, data, 'Giao task xuống phòng ban thành công', 201);
     } catch (error) {
         return sendError(res, error);
     }
@@ -97,6 +104,7 @@ async function getDeptPerformance(req, res) {
 
 module.exports = {
     getWailtingLeader,
+    getApprovedDocuments,
     approve,
     reject,
     assignDepartment,

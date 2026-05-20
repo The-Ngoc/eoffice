@@ -1,4 +1,13 @@
 const managerService = require('../services/managerService');
+const taskDepartmentService = require('../services/taskDepartmentService');
+
+function sendSkeleton(res, data, message) {
+    return res.status(501).json({
+        success: false,
+        data,
+        message
+    });
+}
 
 function sendSuccess(res, data, message, statusCode = 200) {
     return res.status(statusCode).json({
@@ -16,74 +25,99 @@ function sendError(res, error) {
     });
 }
 
-function getRequester(req) {
-    return {
-        id: req.user?.id || req.headers['x-user-id'] || req.headers['user-id'] || req.query?.userId || null,
-        role: req.user?.role || req.headers['x-user-role'] || null
-    };
+async function getAllTasks(req, res) {
+    const data = await managerService.getAllTasks(req.query);
+    return sendSkeleton(res, data, 'Manager API skeleton: getAllTasks');
 }
 
-async function getAssignedTasks(req, res) {
+async function createTask(req, res) {
+    const data = await managerService.createTask(req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: createTask');
+}
+
+async function getTaskById(req, res) {
     try {
-        const data = await managerService.getAssignedTasks(req.query, getRequester(req));
-        return sendSuccess(res, data, 'Lấy danh sách nhiệm vụ được giao thành công');
+        const { taskId } = req.params;
+        const data = await managerService.getTaskById(taskId);
+        return sendSuccess(res, data, 'Lấy chi tiết task thành công');
     } catch (error) {
         return sendError(res, error);
     }
 }
 
-async function getSubTasks(req, res) {
-    try {
-        return sendError(res, {
-            statusCode: 501,
-            message: 'Subtasks không được hỗ trợ trong cấu trúc mới'
-        });
-    } catch (error) {
-        return sendError(res, error);
-    }
+async function receiveTaskFromLeader(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.receiveTaskFromLeader(taskId, req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: receiveTaskFromLeader');
 }
 
-async function getMembers(req, res) {
-    try {
-        const data = await managerService.getMembers(req.query, getRequester(req));
-        return sendSuccess(res, data, 'Lấy danh sách thành viên thành công');
-    } catch (error) {
-        return sendError(res, error);
-    }
+async function getTaskProgress(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.getTaskProgress(taskId);
+    return sendSkeleton(res, data, 'Manager API skeleton: getTaskProgress');
 }
 
-async function assignTask(req, res) {
-    try {
-        const data = await managerService.assignTask(req.body, getRequester(req));
-        return sendSuccess(res, data, 'Phân công task thành công', 201);
-    } catch (error) {
-        return sendError(res, error);
-    }
+async function getProgressReports(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.getProgressReports(taskId);
+    return sendSkeleton(res, data, 'Manager API skeleton: getProgressReports');
 }
 
 async function updateTaskStatus(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.updateTaskStatus(taskId, req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: updateTaskStatus');
+}
+
+async function cancelTask(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.cancelTask(taskId, req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: cancelTask');
+}
+
+async function approveTask(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.approveTask(taskId, req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: approveTask');
+}
+
+async function rejectTask(req, res) {
+    const { taskId } = req.params;
+    const data = await managerService.rejectTask(taskId, req.body);
+    return sendSkeleton(res, data, 'Manager API skeleton: rejectTask');
+}
+
+async function getTasksByDepartmentId(req, res) {
     try {
-        const data = await managerService.updateTaskStatus(req.body);
-        return sendSuccess(res, data, 'Cập nhật trạng thái task thành công');
+        const { departmentId } = req.params;
+        const data = await managerService.getTasksByDepartmentId(departmentId);
+        return sendSuccess(res, data, 'Lấy danh sách task theo phòng ban thành công');
     } catch (error) {
         return sendError(res, error);
     }
 }
 
-async function getStats(req, res) {
+async function getTasksByManagerId(req, res) {
     try {
-        const data = await managerService.getStats(req.query, getRequester(req));
-        return sendSuccess(res, data, 'Lấy KPI phòng ban thành công');
+        const { userId } = req.query;
+        const data = await taskDepartmentService.getTasksByManagerId(userId);
+        return sendSuccess(res, data, 'Lấy danh sách task theo manager thành công');
     } catch (error) {
         return sendError(res, error);
     }
 }
 
 module.exports = {
-    getAssignedTasks,
-    getSubTasks,
-    getMembers,
-    assignTask,
+    getAllTasks,
+    createTask,
+    getTaskById,
+    receiveTaskFromLeader,
+    getTaskProgress,
+    getProgressReports,
     updateTaskStatus,
-    getStats
+    cancelTask,
+    approveTask,
+    rejectTask,
+    getTasksByDepartmentId,
+    getTasksByManagerId
 };
