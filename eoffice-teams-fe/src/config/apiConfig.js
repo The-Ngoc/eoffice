@@ -35,5 +35,14 @@ export const ENDPOINTS = {
     ASSIGN_TASK: '/api/manager/task/assign',
     UPDATE_TASK_STATUS: '/api/manager/task/status',
     STATS: '/api/manager/stats',
+  },
+  SPECIALIST: {
+    TASKS: '/api/specialist/tasks',
+    TASK_DETAIL: (taskId) => `/api/specialist/tasks/${taskId}`,
+    UPDATE_PROGRESS: (taskId) => `/api/specialist/tasks/${taskId}/progress`,
+    ADD_COMMENT: (taskId) => `/api/specialist/tasks/${taskId}/comment`,
+    SUBMIT: (taskId) => `/api/specialist/tasks/${taskId}/submit`,
+    RESUBMIT: (taskId) => `/api/specialist/tasks/${taskId}/resubmit`,
+    DELETE_FILE: (taskId, fileId) => `/api/specialist/tasks/${taskId}/files/${fileId}`,
   }
 };

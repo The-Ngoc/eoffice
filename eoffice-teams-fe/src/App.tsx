@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminProvider } from './context/adminContext';
 import { MainLayout } from './layout/MainLayout';
 import { DashboardRouter } from './routes/DashboardRoutes';
-import { getMyProfile } from './service/userService';
+import { getAllUsers, getMyProfile } from './service/userService';
 import { User, Role } from './models/user';
 
 // Support for Teams SDK
@@ -77,23 +77,6 @@ export default function App() {
   //   initializeApp();
   // }, []);
 
-  // // Show loading state
-  // if (loading) {
-  //   return (
-  //     <div style={{ padding: '20px', textAlign: 'center' }}>
-  //       <p>Loading...</p>
-  //     </div>
-  //   );
-  // }
-
-  // // Show error state
-  // if (error) {
-  //   return (
-  //     <div style={{ padding: '20px', color: 'red', textAlign: 'center' }}>
-  //       <p>{error}</p>
-  //     </div>
-  //   );
-  // }
 
   // // Show main app if user loaded
   // if (currentUser && currentRole) {
@@ -107,26 +90,57 @@ export default function App() {
   // }
 
   const getUserIdFromQuery = (): string | null => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('userId');
-};
+    const params = new URLSearchParams(window.location.search);
+    return params.get('userId');
+  };
 
   useEffect(() => {
   const init = async () => {
     try {
       setLoading(true);
 
-      const userId = getUserIdFromQuery();
+      const userIdFromQuery = getUserIdFromQuery();
+      const userIdFromStorage = localStorage.getItem('eo_user_id');
+      let userId = userIdFromQuery || userIdFromStorage;
 
-      if (!userId) {
-        setError('Missing userId in URL');
-        return;
+      const loadProfile = async (id: string) => {
+        const profile = await getMyProfile(id);
+        setcurrentUser(profile);
+        setCurrentRole(profile.role);
+        localStorage.setItem('eo_user_id', profile.id);
+        localStorage.setItem('eo_user_role', profile.role);
+      };
+
+      try {
+        if (userId) {
+          await loadProfile(userId);
+          return;
+        }
+
+        const users = await getAllUsers();
+        const firstUser = users?.[0];
+        if (!firstUser?.id) {
+          setError('Không có user trong DB. Hãy seed users trước.');
+          return;
+        }
+
+        await loadProfile(firstUser.id);
+      } catch (profileError: any) {
+        // Fallback: userId không tồn tại/404 -> lấy user đầu tiên
+        try {
+          const users = await getAllUsers();
+          const firstUser = users?.[0];
+          if (!firstUser?.id) {
+            setError(profileError?.message || 'Failed to load user');
+            return;
+          }
+
+          await loadProfile(firstUser.id);
+        } catch (fallbackError: any) {
+          console.error(fallbackError);
+          setError(fallbackError?.message || 'Failed to load user');
+        }
       }
-
-      const profile = await getMyProfile(userId);
-
-      setcurrentUser(profile);
-      setCurrentRole(profile.role);
 
     } catch (err) {
       console.error(err);
@@ -138,6 +152,24 @@ export default function App() {
 
   init();
 }, []);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div style={{ padding: '20px', color: 'red', textAlign: 'center' }}>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   if (currentUser && currentRole) {
     return (

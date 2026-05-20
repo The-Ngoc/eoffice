@@ -10,7 +10,7 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3002 --host=0.0.0.0",
     "dev:teamsfx": "env-cmd --silent -f .localConfigs npm run dev",
     "clean": "rimraf ./dist",
     "build": "tsup && npm run build:frontend",

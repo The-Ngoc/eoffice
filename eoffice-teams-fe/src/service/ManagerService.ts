@@ -37,7 +37,9 @@ const normalizeStatus = (status?: string): TaskModel['status'] => {
   const normalized = (status ?? '').toUpperCase();
 
   if (normalized === 'DOING') return 'Doing';
-  if (normalized === 'COMPLETED') return 'Completed';
+  if (normalized === 'WAITING_APPROVAL') return 'UnderReview';
+  if (normalized === 'REJECTED') return 'Rejected';
+  if (normalized === 'DONE' || normalized === 'COMPLETED') return 'Completed';
   if (normalized === 'OVERDUE') return 'Overdue';
 
   return 'Todo';
@@ -113,7 +115,16 @@ export const managerService = {
 
   // Cập nhật trạng thái task.
   updateTaskStatus: async (taskId: string, status: TaskModel['status']): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.MANAGER.UPDATE_TASK_STATUS, { taskId, status });
+    const statusMap = {
+      Todo: 'TODO',
+      Doing: 'DOING',
+      UnderReview: 'WAITING_APPROVAL',
+      Rejected: 'REJECTED',
+      Completed: 'DONE',
+      Overdue: 'OVERDUE',
+    } as const;
+
+    const response = await axiosClient.post(ENDPOINTS.MANAGER.UPDATE_TASK_STATUS, { taskId, status: statusMap[status] ?? status });
     const payload = response.data as ApiResponse<null>;
     return payload.success;
   },

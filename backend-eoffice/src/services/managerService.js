@@ -25,6 +25,8 @@ function mapTask(task) {
         description: item.description || null,
         priority: item.priority || PRIORITY.MEDIUM,
         status: item.status,
+        progress: Number.isFinite(item.progress) ? item.progress : 0,
+        rejectionReason: item.rejectionReason || null,
         dueDate: item.dueDate || null,
         documentId: item.documentId || null,
         memberId: item.memberId || null,
@@ -206,9 +208,44 @@ async function getStats(query = {}, user = {}) {
     };
 }
 
+async function updateTaskStatus(payload = {}) {
+    const taskId = pickValue(payload, 'taskId') || pickValue(payload, 'id');
+    const status = pickValue(payload, 'status');
+    const rejectionReason = pickValue(payload, 'rejectionReason') || pickValue(payload, 'note') || null;
+
+    if (!taskId || !status) {
+        throw createError('taskId và status là bắt buộc', 400);
+    }
+
+    const task = await managerRepository.findTaskById(taskId);
+    if (!task) {
+        throw createError('Task không tồn tại', 404);
+    }
+
+    const nextPayload = { status };
+
+    if (status === TASK_STATUS.REJECTED) {
+        nextPayload.rejectionReason = rejectionReason ? String(rejectionReason) : null;
+        nextPayload.progress = Math.min(99, Number(task.progress || 0));
+    }
+
+    if (status === TASK_STATUS.DONE) {
+        nextPayload.progress = 100;
+        nextPayload.rejectionReason = null;
+    }
+
+    const updated = await managerRepository.updateTaskById(taskId, nextPayload);
+    if (!updated) {
+        throw createError('Không thể cập nhật task', 500);
+    }
+
+    return mapTask(updated);
+}
+
 module.exports = {
     getAssignedTasks,
     getMembers,
     assignTask,
+    updateTaskStatus,
     getStats
 };

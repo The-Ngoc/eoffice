@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const app = require('./src/app');
@@ -169,10 +169,10 @@ async function seedInitialData() {
         }
     });
 
-    console.log(`✅ Da dong bo ${users.length} nguoi dung tu fake-data.json`);
-    console.log(`✅ Da dong bo ${departments.length} phong ban va thanh vien phong ban`);
+    console.log(`âœ… Da dong bo ${users.length} nguoi dung tu fake-data.json`);
+    console.log(`âœ… Da dong bo ${departments.length} phong ban va thanh vien phong ban`);
     if (deletedDemoDocs > 0) {
-        console.log(`✅ Da xoa ${deletedDemoDocs} van ban mau`);
+        console.log(`âœ… Da xoa ${deletedDemoDocs} van ban mau`);
     }
 }
 
@@ -180,19 +180,21 @@ async function seedInitialData() {
 async function startServer() {
     try {
         await sequelize.authenticate();
-        console.log('✅ Kết nối DB thành công.');
+        console.log('âœ… Káº¿t ná»‘i DB thÃ nh cÃ´ng.');
 
-        // await sequelize.sync({ alter: true });
-        // console.log('✅ Database đã được đồng bộ hóa.');
+        if (String(process.env.DB_SYNC || '').trim().toLowerCase() === 'true') {
+            await sequelize.sync({ alter: true });
+            console.log('✅ Database đã được đồng bộ hóa (DB_SYNC=true).');
+        }
 
         // await seedInitialData();
-        // console.log('✅ Đã nạp dữ liệu mẫu thành công.');
+        // console.log('âœ… ÄÃ£ náº¡p dá»¯ liá»‡u máº«u thÃ nh cÃ´ng.');
 
         app.listen(PORT, () => {
-            console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
+            console.log(`ðŸš€ Server cháº¡y táº¡i http://localhost:${PORT}`);
         });
     } catch (err) {
-        console.error('❌ Lỗi khởi động:', err);
+        console.error('âŒ Lá»—i khá»Ÿi Ä‘á»™ng:', err);
         process.exit(1);
     }
 }

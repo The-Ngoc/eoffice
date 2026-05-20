@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, 
   Bot, 
@@ -41,14 +41,21 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [semanticQuery, setSemanticQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
 
+  const [isTaskLoading, setIsTaskLoading] = useState(false);
+  const [dailyLog, setDailyLog] = useState('');
+  const [showSubmission, setShowSubmission] = useState(false);
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
+  const notesRef = useRef<HTMLDivElement | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
     if (selectedTask) {
-       // Reset progress when selecting a task - in real app would fetch actual progress
-       setProgress(selectedTask.status === 'Completed' ? 100 : 30);
+       setProgress(typeof selectedTask.progress === 'number' ? selectedTask.progress : (selectedTask.status === 'Completed' ? 100 : 0));
     }
   }, [selectedTask]);
 
@@ -67,6 +74,34 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
       console.error('Failed to load data', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearSubmissionDraft = () => {
+    setShowSubmission(false);
+    setSubmissionFiles([]);
+    setDailyLog('');
+    if (notesRef.current) {
+      notesRef.current.innerHTML = '';
+    }
+  };
+
+  const refreshSelectedTask = async (taskId: string) => {
+    const detail = await specialistService.getTaskDetail(taskId);
+    setSelectedTask(detail);
+    setProgress(typeof detail.progress === 'number' ? detail.progress : 0);
+  };
+
+  const openTask = async (task: TaskModel) => {
+    setSelectedTask(task);
+    setIsTaskLoading(true);
+    try {
+      clearSubmissionDraft();
+      await refreshSelectedTask(task.id);
+    } catch (err) {
+      console.error('Failed to load task detail', err);
+    } finally {
+      setIsTaskLoading(false);
     }
   };
 
@@ -95,8 +130,8 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
     if (!selectedTask) return;
     const success = await specialistService.acceptTask(selectedTask.id);
     if (success) {
-      setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, status: 'Doing' } : t));
-      setSelectedTask({ ...selectedTask, status: 'Doing' });
+      await loadData();
+      await refreshSelectedTask(selectedTask.id);
     }
   };
 
@@ -104,9 +139,80 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
     if (!selectedTask) return;
     const success = await specialistService.completeTask(selectedTask.id);
     if (success) {
-      setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, status: 'Completed' } : t));
-      setSelectedTask({ ...selectedTask, status: 'Completed' });
-      setProgress(100);
+      await loadData();
+      await refreshSelectedTask(selectedTask.id);
+    }
+  };
+
+  const getStatusLabel = (status: TaskModel['status']) => {
+    if (status === 'Todo') return 'To Do';
+    if (status === 'Doing') return 'In Progress';
+    if (status === 'UnderReview') return 'Under Review';
+    if (status === 'Rejected') return 'Rejected';
+    return status;
+  };
+
+  const handleUpdateProgress = async () => {
+    if (!selectedTask) return;
+
+    setIsUpdatingProgress(true);
+    try {
+      const ok = await specialistService.updateTaskProgressWithLog(selectedTask.id, progress, dailyLog.trim() || undefined);
+      if (ok) {
+        setDailyLog('');
+        await loadData();
+        await refreshSelectedTask(selectedTask.id);
+      }
+    } catch (err) {
+      console.error('Failed to update progress', err);
+    } finally {
+      setIsUpdatingProgress(false);
+    }
+  };
+
+  const addFiles = (incoming: FileList | File[]) => {
+    const list = Array.isArray(incoming) ? incoming : Array.from(incoming);
+    if (!list.length) return;
+    setSubmissionFiles((current) => [...current, ...list]);
+  };
+
+  const removeSubmissionFile = (index: number) => {
+    setSubmissionFiles((current) => current.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedTask) return;
+
+    setIsSubmitting(true);
+    try {
+      const notes = notesRef.current?.innerHTML || '';
+      const isResubmit = selectedTask.status === 'Rejected';
+      const ok = isResubmit
+        ? await specialistService.resubmitTask(selectedTask.id, notes, submissionFiles)
+        : await specialistService.submitTask(selectedTask.id, notes, submissionFiles);
+
+      if (ok) {
+        clearSubmissionDraft();
+        await loadData();
+        await refreshSelectedTask(selectedTask.id);
+      }
+    } catch (err) {
+      console.error('Failed to submit task', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteExistingFile = async (fileId: string) => {
+    if (!selectedTask) return;
+
+    try {
+      const ok = await specialistService.deleteTaskFile(selectedTask.id, fileId);
+      if (ok) {
+        await refreshSelectedTask(selectedTask.id);
+      }
+    } catch (err) {
+      console.error('Failed to delete file', err);
     }
   };
 
@@ -176,7 +282,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                       {tasks.map(task => (
                         <div 
                           key={task.id}
-                          onClick={() => setSelectedTask(task)}
+                          onClick={() => openTask(task)}
                           className={`p-4 rounded-xl border transition-all cursor-pointer group ${selectedTask?.id === task.id ? 'bg-teams-purple/5 border-teams-purple ring-1 ring-teams-purple/20' : 'bg-white border-teams-border hover:border-teams-purple/30'}`}
                         >
                           <div className="flex justify-between items-start mb-2">
@@ -304,6 +410,16 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                              <span className="text-[9px] font-bold text-teams-purple uppercase tracking-tighter">Gửi bởi: {selectedTask.sender}</span>
                              <span className="text-[9px] text-gray-300">|</span>
                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Hạn: {selectedTask.deadline}</span>
+                             <span className="text-[9px] text-gray-300">|</span>
+                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                               selectedTask.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                               selectedTask.status === 'UnderReview' ? 'bg-amber-100 text-amber-700' :
+                               selectedTask.status === 'Doing' ? 'bg-blue-100 text-blue-700' :
+                               selectedTask.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                               'bg-gray-100 text-gray-600'
+                             }`}>
+                               {getStatusLabel(selectedTask.status)}
+                             </span>
                           </div>
                         </div>
                       </div>
@@ -316,9 +432,21 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                         )}
                         {selectedTask.status === 'Doing' && (
                           <button 
-                            onClick={handleCompleteTask}
+                            onClick={() => setShowSubmission(true)}
                             className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md shadow-green-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                          >Hoàn thành</button>
+                          >Submit Task</button>
+                        )}
+                        {selectedTask.status === 'UnderReview' && (
+                          <button
+                            disabled
+                            className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg text-xs font-black border border-amber-200 cursor-not-allowed"
+                          >Đã gửi - chờ duyệt</button>
+                        )}
+                        {selectedTask.status === 'Rejected' && (
+                          <button
+                            onClick={() => setShowSubmission(true)}
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md shadow-red-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                          >Sửa đổi &amp; Gửi lại</button>
                         )}
                         <button className="p-2 bg-white border border-teams-border rounded-lg text-text-secondary"><MoreVertical size={18} /></button>
                       </div>
@@ -328,52 +456,179 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                       <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-8">
                          {/* Description & Progress */}
                          <div className="md:col-span-7 space-y-8">
+                            {isTaskLoading && (
+                              <div className="p-4 bg-white border border-teams-border rounded-2xl text-xs font-bold text-gray-500">Đang tải chi tiết task...</div>
+                            )}
+
+                            {selectedTask.status === 'Rejected' && (
+                              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
+                                <div className="text-[10px] font-black text-red-700 uppercase tracking-widest">Task bị từ chối</div>
+                                <div className="text-xs text-red-800 mt-2 whitespace-pre-wrap">{selectedTask.rejectionReason || 'Chưa có lý do từ chối.'}</div>
+                              </div>
+                            )}
+
                             <section className="space-y-3">
-                               <div className="flex items-center gap-2">
-                                  <Zap size={16} className="text-orange-500" />
-                                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Chỉ đạo từ cấp trên</h3>
-                               </div>
-                               <div className="p-4 bg-orange-50/50 border border-orange-100 rounded-2xl relative overflow-hidden">
-                                  <Bot size={80} className="absolute -right-4 -bottom-4 text-orange-200/40" />
-                                  <p className="text-xs text-text-main leading-relaxed font-medium italic relative z-10">"{selectedTask.aiSummary || selectedTask.description}"</p>
-                               </div>
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Thông tin chung</h3>
+                                <span className="text-[10px] font-black text-teams-purple">#{selectedTask.id}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                  <div className="text-[9px] font-black text-gray-400 uppercase">Người giao</div>
+                                  <div className="text-xs font-bold text-text-main mt-1">{selectedTask.sender || 'N/A'}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                  <div className="text-[9px] font-black text-gray-400 uppercase">Độ ưu tiên</div>
+                                  <div className="text-xs font-bold text-text-main mt-1">{selectedTask.priority}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                  <div className="text-[9px] font-black text-gray-400 uppercase">Ngày tạo</div>
+                                  <div className="text-xs font-bold text-text-main mt-1">{selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleDateString() : 'N/A'}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                  <div className="text-[9px] font-black text-gray-400 uppercase">Hạn chót</div>
+                                  <div className="text-xs font-bold text-text-main mt-1">{selectedTask.deadline || 'N/A'}</div>
+                                </div>
+                              </div>
+                            </section>
+
+                            <section className="space-y-3">
+                              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mô tả chi tiết</h3>
+                              <div className="p-4 bg-white border border-teams-border rounded-2xl">
+                                <div className="text-sm text-text-main leading-relaxed whitespace-pre-wrap">{selectedTask.description || 'Không có mô tả'}</div>
+                              </div>
                             </section>
 
                             <section className="space-y-4">
-                               <InteractiveProgressBar value={progress} onChange={setProgress} />
-                               <div className="grid grid-cols-3 gap-2">
-                                  {[0, 50, 100].map(v => (
-                                    <button 
-                                      key={v}
-                                      onClick={() => setProgress(v)}
-                                      className={`py-1.5 rounded-lg border text-[10px] font-black transition-all ${progress === v ? 'bg-teams-purple text-white border-teams-purple' : 'bg-white text-gray-400 border-gray-100'}`}
-                                    >
-                                      {v === 0 ? 'Chưa làm' : v === 50 ? 'Đang làm' : 'Xong'}
-                                    </button>
-                                  ))}
-                               </div>
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cập nhật tiến độ</h3>
+                                <span className="text-[10px] font-black text-teams-purple">{progress}%</span>
+                              </div>
+                              <InteractiveProgressBar value={progress} onChange={setProgress} />
+                              <div className="grid grid-cols-4 gap-2">
+                                {[25, 50, 75, 100].map((v) => (
+                                  <button
+                                    key={v}
+                                    onClick={() => setProgress(v)}
+                                    className={`py-1.5 rounded-lg border text-[10px] font-black transition-all ${
+                                      progress === v
+                                        ? 'bg-teams-purple text-white border-teams-purple'
+                                        : 'bg-white text-gray-500 border-gray-200 hover:border-teams-purple/40'
+                                    }`}
+                                  >{v}%</button>
+                                ))}
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Báo cáo nhanh</label>
+                                <textarea
+                                  value={dailyLog}
+                                  onChange={(e) => setDailyLog(e.target.value)}
+                                  placeholder="Ví dụ: Đã thiết kế xong DB, đang viết Service"
+                                  className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-teams-purple rounded-2xl outline-none text-sm font-medium resize-none transition-all"
+                                  rows={3}
+                                />
+                                <button
+                                  onClick={handleUpdateProgress}
+                                  disabled={isUpdatingProgress || !selectedTask}
+                                  className="w-full py-3 bg-teams-purple text-white rounded-xl text-[11px] font-black uppercase shadow-lg shadow-teams-purple/20 hover:scale-[1.01] transition-all active:scale-95 disabled:opacity-50"
+                                >{isUpdatingProgress ? 'Đang cập nhật...' : 'Cập nhật'}</button>
+                              </div>
                             </section>
 
                             <section className="space-y-3">
-                               <div className="flex items-center justify-between">
-                                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sản phẩm đầu ra</h3>
-                                  <button className="text-[10px] font-bold text-teams-purple flex items-center gap-1">
-                                    <Plus size={12} />
-                                    <span>Template mẫu</span>
-                                  </button>
-                               </div>
-                               <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center space-y-3 hover:border-teams-purple/40 hover:bg-teams-purple/5 transition-all cursor-pointer group">
-                                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 group-hover:scale-110 group-hover:text-teams-purple transition-all">
-                                    <Upload size={24} />
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-bold text-text-main">Tải lên file kết quả xử lý</p>
-                                    <p className="text-[10px] text-text-secondary mt-1">Kéo thả PDF, Word, hoặc Excel vào đây</p>
-                                  </div>
-                               </div>
+                              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Activity log</h3>
+                              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                {(selectedTask.history || []).length === 0 ? (
+                                  <div className="text-xs text-gray-400 italic">Chưa có log.</div>
+                                ) : (
+                                  (selectedTask.history || []).map((h) => (
+                                    <div key={h.id} className="p-3 bg-white border border-gray-100 rounded-xl">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-[10px] font-black text-text-main">{h.user?.fullName || 'Bạn'} • {h.type}</div>
+                                        <div className="text-[10px] font-bold text-gray-400">{new Date(h.createdAt).toLocaleString()}</div>
+                                      </div>
+                                      {(h.progress !== null && h.progress !== undefined) && (
+                                        <div className="text-[10px] font-bold text-teams-purple mt-1">Progress: {h.progress}%</div>
+                                      )}
+                                      {h.content && <div className="text-xs text-text-main mt-2 whitespace-pre-wrap">{h.content}</div>}
+                                    </div>
+                                  ))
+                                )}
+                              </div>
                             </section>
-                         </div>
 
+                            {(showSubmission || progress >= 100 || selectedTask.status === 'Rejected') && (
+                              <section className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nộp bài</h3>
+                                  <button
+                                    onClick={() => setShowSubmission((v) => !v)}
+                                    className="text-[10px] font-bold text-teams-purple"
+                                  >{showSubmission ? 'Ẩn' : 'Mở form'}</button>
+                                </div>
+
+                                <div
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
+                                  className="border-2 border-dashed border-gray-200 rounded-2xl p-6 bg-white hover:border-teams-purple/40 hover:bg-teams-purple/5 transition-all"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-xs font-bold text-text-main">Kéo thả file hoặc chọn file</div>
+                                    <label className="text-[10px] font-black px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 cursor-pointer">
+                                      Chọn file
+                                      <input type="file" multiple className="hidden" onChange={(e) => e.target.files && addFiles(e.target.files)} />
+                                    </label>
+                                  </div>
+
+                                  {submissionFiles.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                      {submissionFiles.map((f, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 border border-gray-100 rounded-lg">
+                                          <div className="text-xs font-bold text-text-main truncate">{f.name}</div>
+                                          <div className="flex items-center gap-3">
+                                            <div className="text-[10px] font-bold text-gray-500">{Math.round(f.size / 1024)} KB</div>
+                                            <button onClick={() => removeSubmissionFile(idx)} className="text-[10px] font-black text-red-600">Xóa</button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {(selectedTask.files || []).length > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">File đã nộp</div>
+                                    {(selectedTask.files || []).map((f) => (
+                                      <div key={f.id} className="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg">
+                                        <a className="text-xs font-bold text-teams-purple truncate" href={f.url} target="_blank" rel="noreferrer">{f.nameFile}</a>
+                                        <button
+                                          onClick={() => handleDeleteExistingFile(f.id)}
+                                          className="text-[10px] font-black text-red-600"
+                                        >Xóa</button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="space-y-2">
+                                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ghi chú nộp bài (Rich Text)</div>
+                                  <div
+                                    ref={notesRef}
+                                    contentEditable
+                                    className="min-h-24 p-3 bg-white border border-gray-200 focus:border-teams-purple rounded-2xl outline-none text-sm"
+                                    placeholder="Ghi chú cho Manager..."
+                                    onInput={() => { /* keep uncontrolled */ }}
+                                  />
+                                </div>
+
+                                <button
+                                  onClick={handleSubmit}
+                                  disabled={isSubmitting}
+                                  className="w-full py-3 bg-green-600 text-white rounded-xl text-[11px] font-black uppercase shadow-lg shadow-green-200 hover:scale-[1.01] transition-all active:scale-95 disabled:opacity-50"
+                                >{isSubmitting ? 'Đang gửi...' : (selectedTask.status === 'Rejected' ? 'Gửi lại cho Manager' : 'Submit Task')}</button>
+                              </section>
+                            )}
+                         </div>
                          {/* Context & Discussion (Sidebar) */}
                          <div className="md:col-span-5 space-y-6">
                             <section className="space-y-3">
