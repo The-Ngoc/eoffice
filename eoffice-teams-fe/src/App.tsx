@@ -112,32 +112,33 @@ export default function App() {
 };
 
   useEffect(() => {
-  const init = async () => {
-    try {
-      setLoading(true);
+    const init = async () => {
+      try {
+        setLoading(true);
 
-      const userId = getUserIdFromQuery();
+        const userId = getUserIdFromQuery();
 
-      if (!userId) {
-        setError('Missing userId in URL');
-        return;
+        if (!userId) {
+          setError('Missing userId in URL');
+          return;
+        }
+
+        const profile = await getMyProfile(userId);
+
+        setcurrentUser(profile);
+        setCurrentRole(profile.role);
+        localStorage.setItem('eo_user_id', profile.id);
+        localStorage.setItem('eo_user_role', profile.role);
+      } catch (err) {
+        console.error(err);
+        setError('Failed to load user');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const profile = await getMyProfile(userId);
-
-      setcurrentUser(profile);
-      setCurrentRole(profile.role);
-
-    } catch (err) {
-      console.error(err);
-      setError('Failed to load user');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  init();
-}, []);
+    init();
+  }, []);
 
   if (currentUser && currentRole) {
     return (
@@ -151,5 +152,3 @@ export default function App() {
 
   return null;
 }
-
-

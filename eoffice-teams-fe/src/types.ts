@@ -85,6 +85,10 @@ export interface TaskModel {
   assigneeId?: string;
   aiSummary?: string;
   attachments?: string[];
+  departmentName?: string;
+  documentNumber?: string;
+  documentStatus?: string;
+  note?: string;
 }
 
 export interface MemberModel {

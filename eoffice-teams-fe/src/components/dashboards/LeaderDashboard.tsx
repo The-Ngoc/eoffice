@@ -30,7 +30,9 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, AreaCh
 
 export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [activeView, setActiveView] = useState<'List' | 'Chart'>('List');
+  const [docView, setDocView] = useState<'pending' | 'approved'>('pending');
   const [pendingDocs, setPendingDocs] = useState<DocumentTask[]>([]);
+  const [approvedDocs, setApprovedDocs] = useState<DocumentTask[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<DocumentTask | null>(null);
   const [stats, setStats] = useState<KPIStats | null>(null);
   const [deptPerformance, setDeptPerformance] = useState<LeaderDeptPerformance[]>([]);
@@ -45,6 +47,8 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [approvedDocId, setApprovedDocId] = useState<string | null>(null);
+  const [directionDescription, setDirectionDescription] = useState('');
+  const [isForwardingDoc, setIsForwardingDoc] = useState(false);
 
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
@@ -81,14 +85,14 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
     setIsLoading(true);
     try {
       //  kpi, performance 
-      const [docs, depts] = await Promise.all([
+      const [docs, depts, approved] = await Promise.all([
         leaderService.getPendingDocuments(),
-        // leaderService.getLeaderStats(),
-        // leaderService.getDeptPerformance(),
-        leaderService.getDepartments()
+        leaderService.getDepartments(),
+        leaderService.getApprovedDocuments().catch(() => [])
       ]);
       setPendingDocs(docs);
       setDepartments(depts);
+      setApprovedDocs(approved);
       // setStats(kpi);
       // setDeptPerformance(performance);
     } catch (err) {
@@ -97,6 +101,17 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!showForwardModal) {
+      // Reset form khi modal đóng
+      setTimeout(() => {
+        setSelectedDept('');
+        setSelectedManager(null);
+        setDirectionDescription('');
+      }, 300);
+    }
+  }, [showForwardModal]);
 
   useEffect(() => {
     const loadManager = async () => {
@@ -124,6 +139,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
       setApprovedDocId(selectedDoc.id);
       setSelectedDept('');
       setSelectedManager(null);
+      setDirectionDescription('');
       setShowForwardModal(true);
     }
   };
@@ -142,19 +158,30 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   const handleForward = async () => {
     if (!selectedDoc || !selectedDept || approvedDocId !== selectedDoc.id) return;
-    const success = await leaderService.assignDepartment(selectedDoc.id, selectedDept);
-    if (success) {
-      setPendingDocs(prev => prev.filter(d => d.id !== selectedDoc.id));
-      setSelectedDoc(null);
-      setShowForwardModal(false);
-      setSelectedDept('');
-      setSelectedManager(null);
-      setApprovedDocId(null);
-      if (stats) setStats({ ...stats, pendingApprovals: Math.max(stats.pendingApprovals - 1, 0) });
+    
+    setIsForwardingDoc(true);
+    try {
+      const success = await leaderService.assignDepartmentToProcess(
+        selectedDoc.id,
+        selectedDept,
+        directionDescription,
+        selectedManager?.managerId,
+      );
+      if (success) {
+        setPendingDocs(prev => prev.filter(d => d.id !== selectedDoc.id));
+        setApprovedDocs(prev => [...prev, selectedDoc]);
+        setSelectedDoc(null);
+        setShowForwardModal(false);
+        setSelectedDept('');
+        setSelectedManager(null);
+        setDirectionDescription('');
+        setApprovedDocId(null);
+        if (stats) setStats({ ...stats, pendingApprovals: Math.max(stats.pendingApprovals - 1, 0) });
+      }
+    } finally {
+      setIsForwardingDoc(false);
     }
   };
-
-  const currentManager = selectedManager;
 
   const formatDate = (dateText?: string) => {
     if (!dateText) return '';
@@ -226,26 +253,58 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
             {/* List Column */}
             <div className={`transition-all duration-500 overflow-hidden ${selectedDoc ? 'lg:col-span-5' : 'lg:col-span-12'}`}>
               <div className="teams-card h-full min-h-125 flex flex-col">
-                <div className="p-4 border-b border-teams-border flex justify-between items-center bg-gray-50/50">
-                  <h2 className="font-bold text-sm text-text-main flex items-center gap-2">
-                    <Clock size={16} className="text-teams-purple" />
-                    Hộp thư phê duyệt
-                  </h2>
-                  <div className="relative">
+                {/* Tabs */}
+                <div className="p-3 border-b border-teams-border flex gap-2 bg-gray-50/50">
+                  <button
+                    onClick={() => {
+                      setDocView('pending');
+                      setSelectedDoc(null);
+                    }}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      docView === 'pending'
+                        ? 'bg-teams-purple text-white'
+                        : 'bg-white text-text-secondary hover:bg-gray-100 border border-teams-border'
+                    }`}
+                  >
+                    <Clock size={12} className="inline mr-1" />
+                    Văn bản duyệt ({pendingDocs.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDocView('approved');
+                      setSelectedDoc(null);
+                    }}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                      docView === 'approved'
+                        ? 'bg-teams-purple text-white'
+                        : 'bg-white text-text-secondary hover:bg-gray-100 border border-teams-border'
+                    }`}
+                  >
+                    <CheckCircle size={12} className="inline mr-1" />
+                    Văn bản đã duyệt ({approvedDocs.length})
+                  </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="p-4 border-b border-teams-border flex items-center bg-gray-50/50">
+                  <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
                     <input 
                       type="text" 
                       placeholder="Tìm kiếm..."
-                      className="pl-8 pr-4 py-1.5 bg-white border border-teams-border rounded-md text-[11px] outline-none focus:border-teams-purple w-40"
+                      className="pl-8 pr-4 py-1.5 bg-white border border-teams-border rounded-md text-[11px] outline-none focus:border-teams-purple w-full"
                     />
                   </div>
                 </div>
 
+                {/* Document List */}
                 <div className="divide-y divide-teams-border overflow-y-auto max-h-150 custom-scrollbar">
-                  {pendingDocs.length === 0 ? (
-                    <div className="p-12 text-center text-text-secondary italic text-sm">Tất cả văn bản đã được xử lý xong.</div>
+                  {(docView === 'pending' ? pendingDocs : approvedDocs).length === 0 ? (
+                    <div className="p-12 text-center text-text-secondary italic text-sm">
+                      {docView === 'pending' ? 'Tất cả văn bản đã được xử lý xong.' : 'Chưa có văn bản đã duyệt.'}
+                    </div>
                   ) : (
-                    pendingDocs.map(doc => (
+                    (docView === 'pending' ? pendingDocs : approvedDocs).map(doc => (
                       <div 
                         key={doc.id}
                         onClick={() => setSelectedDoc(doc)}
@@ -535,11 +594,16 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative z-60 space-y-6"
+              className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative z-60 space-y-6 max-h-[80vh] overflow-y-auto"
             >
                <div className="flex justify-between items-center">
                   <h3 className="text-xl font-black text-text-main">Chuyển phòng ban xử lý</h3>
-                  <button onClick={() => setShowForwardModal(false)} className="text-gray-400"><XCircle size={24} /></button>
+                  <button 
+                    onClick={() => setShowForwardModal(false)} 
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XCircle size={24} />
+                  </button>
                </div>
 
                <div className="space-y-4">
@@ -549,46 +613,74 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                       className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-teams-purple rounded-xl outline-none transition-all font-bold text-sm"
                       value={selectedDept}
                       onChange={(e) => setSelectedDept(e.target.value)}
+                      disabled={isForwardingDoc}
                     >
                       <option value="">-- Vui lòng chọn --</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
 
-                  <AnimatePresence>
-                    {selectedDept && currentManager && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 bg-teams-purple/5 border-2 border-teams-purple/10 rounded-xl flex items-center space-x-4"
-                      >
-                         <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                            <UserCheck className="text-teams-purple" size={24} />
-                         </div>
-                         <div>
-                            <p className="text-[10px] font-black text-teams-purple uppercase">Trưởng phòng phụ trách</p>
-                            <p className="text-sm font-black text-text-main">{currentManager.managerName}</p>
-                            <p className="text-[10px] text-text-secondary mt-0.5">Sẽ nhận được chỉ đạo ngay khi bạn nhấn Gửi</p>
-                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {selectedDept && selectedManager && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-teams-purple/5 border-2 border-teams-purple/10 rounded-xl flex items-center space-x-4"
+                    >
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <UserCheck className="text-teams-purple" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-teams-purple uppercase">Trưởng phòng phụ trách</p>
+                        <p className="text-sm font-black text-text-main">{selectedManager.managerName}</p>
+                        <p className="text-[10px] text-text-secondary mt-0.5">Sẽ nhận được chỉ đạo</p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {selectedDept && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-1.5"
+                    >
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                        Mô tả task được giao
+                      </label>
+                      <textarea
+                        value={directionDescription}
+                        onChange={(e) => setDirectionDescription(e.target.value)}
+                        placeholder="Nhập mô tả/định hướng cho phòng ban xử lý..."
+                        disabled={isForwardingDoc}
+                        className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-teams-purple rounded-xl outline-none transition-all font-medium text-sm resize-none h-28"
+                      />
+                    </motion.div>
+                  )}
                </div>
 
                <div className="flex gap-3">
                   <button 
                     onClick={() => setShowForwardModal(false)}
-                    className="flex-1 py-3 text-sm font-black text-text-secondary"
+                    disabled={isForwardingDoc}
+                    className="flex-1 py-3 text-sm font-black text-text-secondary hover:bg-gray-100 rounded-xl transition-all disabled:opacity-50"
                   >
                     Hủy bỏ
                   </button>
                   <button 
                     onClick={handleForward}
-                    disabled={!selectedDept || approvedDocId !== selectedDoc?.id}
+                    disabled={!selectedDept || approvedDocId !== selectedDoc?.id || !directionDescription.trim() || isForwardingDoc}
                     className="flex-1 bg-teams-purple text-white py-3 rounded-xl text-sm font-black shadow-lg shadow-teams-purple/20 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2"
                   >
-                    <ArrowRight size={18} />
-                    <span>Xác nhận Gửi</span>
+                    {isForwardingDoc ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Đang gửi...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight size={18} />
+                        <span>Xác nhận Gửi</span>
+                      </>
+                    )}
                   </button>
                </div>
             </motion.div>

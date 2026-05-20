@@ -20,6 +20,7 @@ export const ENDPOINTS = {
   },
   LEADER: {
     WAITING_LEADER_DOCUMENTS: '/api/leader/documents/waiting-leader',
+    APPROVED_DOCUMENTS: '/api/leader/documents/approved',
     APPROVE: '/api/leader/document/approve',
     REJECT: '/api/leader/document/reject',
     ASSIGN_DEPARTMENT: '/api/leader/document/assign-department',
@@ -29,7 +30,7 @@ export const ENDPOINTS = {
     DEPT_PERFORMANCE: '/api/leader/stats/dept-performance',
   },
   MANAGER: {
-    ASSIGNED_TASKS: '/api/manager/tasks/assigned',
+    MY_TASKS: '/api/manager/tasks/my',
     SUB_TASKS: '/api/manager/tasks/sub',
     MEMBERS: '/api/manager/members',
     ASSIGN_TASK: '/api/manager/task/assign',

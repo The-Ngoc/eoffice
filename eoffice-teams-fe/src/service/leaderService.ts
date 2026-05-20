@@ -103,11 +103,28 @@ export const leaderService = {
     return payload.success;
   },
 
-  // Chỉ định văn bản cho phòng ban xử lý.
-  assignDepartment: async (docId: string, deptId: string): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.LEADER.ASSIGN_DEPARTMENT, { docId, deptId });
+  // Chỉ định văn bản cho phòng ban xử lý từ Leader.
+  assignDepartmentToProcess: async (
+    docId: string,
+    deptId: string,
+    directionDescription?: string,
+    managerId?: string,
+  ): Promise<boolean> => {
+    const response = await axiosClient.post(ENDPOINTS.LEADER.ASSIGN_DEPARTMENT, {
+      docId,
+      deptId,
+      directionDescription,
+      managerId,
+    });
     const payload = response.data as ApiResponse<null>;
     return payload.success;
+  },
+
+  // Lấy danh sách văn bản đã duyệt.
+  getApprovedDocuments: async (): Promise<DocumentTask[]> => {
+    const response = await axiosClient.get(ENDPOINTS.LEADER.APPROVED_DOCUMENTS);
+    const payload = response.data as ApiResponse<DocumentTask[]>;
+    return (payload.data ?? []).map(mapDocumentDto);
   },
 
   // Lấy danh sách phòng ban để hiển thị dropdown.

@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '../../models/user';
-import { TaskModel, MemberModel, KPIStats } from '../../types';
+import { Department, TaskModel, MemberModel, KPIStats } from '../../types';
+import { leaderService } from '../../service/leaderService';
 import { managerService } from '../../service/ManagerService';
 import { StatCard, StatusBadge } from '../common/SharedComponents';
 
@@ -54,16 +55,9 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasks, subtasks, deptMembers, kpi] = await Promise.all([
-        managerService.getAssignedTasks(),
-        managerService.getSubTasks(),
-        managerService.getDepartmentMembers(),
-        managerService.getManagementStats()
-      ]);
+      const tasks = await managerService.getMyTasks(user.id);
       setInboundTasks(tasks);
-      setTeamTasks(subtasks);
-      setMembers(deptMembers);
-      setStats(kpi);
+      setSelectedTask(tasks[0] ?? null);
     } catch (err) {
       console.error('Failed to load manager dashboard data', err);
     } finally {
@@ -82,20 +76,20 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
     return parsed.toLocaleDateString('vi-VN');
   };
 
-  const handleAssignTask = async () => {
-    if (!newTask.title || !newTask.assigneeId) return;
-    const success = await managerService.assignTaskToMember({
-      ...newTask,
-      sender: user.fullName,
-      createdAt: new Date().toISOString(),
-      parentId: selectedTask?.id // Assign subtask linked to selected leader task
-    });
-    if (success) {
-      setShowAssignModal(false);
-      setNewTask({ title: '', priority: 'Medium', status: 'Todo', deadline: '' });
-      loadData();
-    }
-  };
+  // const handleAssignTask = async () => {
+  //   if (!newTask.title || !newTask.assigneeId) return;
+  //   const success = await managerService.assignTaskToMember({
+  //     ...newTask,
+  //     sender: user.fullName,
+  //     createdAt: new Date().toISOString(),
+  //     parentId: selectedTask?.id // Assign subtask linked to selected leader task
+  //   });
+  //   if (success) {
+  //     setShowAssignModal(false);
+  //     setNewTask({ title: '', priority: 'Medium', status: 'Todo', deadline: '' });
+  //     loadData();
+  //   }
+  // };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -142,7 +136,7 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
             <div className="p-4 border-b border-teams-border bg-gray-50/50 flex justify-between items-center">
                <h2 className="font-bold text-sm text-text-main flex items-center gap-2">
                  {activeTab === 'Inbound' ? <Send size={16} className="text-teams-purple" /> : <Layout size={16} className="text-teams-purple" />}
-                 {activeTab === 'Inbound' ? 'Danh sách chỉ đạo' : 'Tiến độ xử lý của Phòng'}
+                 {activeTab === 'Inbound' ? `Danh sách chỉ đạo (${inboundTasks.length})` : `Tiến độ xử lý của Phòng (${teamTasks.length})`}
                </h2>
                <div className="flex items-center space-x-2">
                   <div className="relative">
@@ -481,7 +475,7 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                      Hủy
                    </button>
                    <button 
-                    onClick={handleAssignTask}
+                    // onClick={handleAssignTask}
                     disabled={!newTask.title || !newTask.assigneeId}
                     className="flex-1 bg-teams-purple text-white py-3 rounded-xl text-sm font-black shadow-lg shadow-teams-purple/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
                    >

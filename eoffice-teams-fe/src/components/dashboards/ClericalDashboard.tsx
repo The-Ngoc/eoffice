@@ -9,7 +9,6 @@ import {
   Send,
   Bot,
   X,
-  Plus,
   History,
   FilePlus,
   MoreVertical,
@@ -166,6 +165,10 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     [documents],
   );
 
+
+
+
+  
   const urgentCount = useMemo(() => documents.filter((doc) => doc.urgency === 'Hỏa tốc').length, [documents]);
 
   const waitingPublishCount = useMemo(
