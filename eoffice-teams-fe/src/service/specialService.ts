@@ -1,40 +1,63 @@
-
+import axiosClient from '../api/axiosClient';
+import { ENDPOINTS } from '../config/apiConfig';
 import { TaskModel, Meeting, ChatMessage } from '../types';
 
-const MOCK_TASKS: TaskModel[] = [
-  {
-    id: 'TASK-101',
-    title: 'Soạn thảo tờ trình phê duyệt dự án Chuyển đổi số 2.0',
-    description: 'Cần liệt kê chi tiết các hạng mục đầu tư và lộ trình triển khai trong năm 2024.',
-    sender: 'Lê Trưởng Phòng',
-    status: 'Doing',
-    priority: 'High',
-    deadline: '2024-04-30',
-    createdAt: '2024-04-20',
-    aiSummary: 'Ý kiến sếp: "Tập trung vào hiệu quả chi phí và khả năng tích hợp hệ thống cũ".',
-    attachments: ['chidao_duan.pdf']
-  },
-  {
-    id: 'TASK-102',
-    title: 'Rà soát văn bản quy định về ATTT mới ban hành',
-    description: 'Đối chiếu các quy định mới với hệ thống hiện tại để tìm điểm cần cập nhật.',
-    sender: 'Lê Trưởng Phòng',
-    status: 'Todo',
-    priority: 'Medium',
-    deadline: '2024-05-05',
-    createdAt: '2024-04-25',
-  },
-  {
-    id: 'TASK-103',
-    title: 'Báo cáo tuần lễ ATTT',
-    description: 'Tổng hợp số liệu từ các đơn vị gửi về.',
-    sender: 'Lê Trưởng Phòng',
-    status: 'Completed',
-    priority: 'Low',
-    deadline: '2024-04-26',
-    createdAt: '2024-04-22',
-  }
-];
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+type BackendPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type BackendStatus = 'TODO' | 'DOING' | 'WAITING_APPROVAL' | 'REJECTED' | 'DONE' | 'OVERDUE';
+
+interface BackendTaskDto {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: BackendStatus;
+  priority?: BackendPriority | null;
+  dueDate?: string | null;
+  createdAt: string;
+  progress?: number;
+  rejectionReason?: string | null;
+  assigner?: { fullName?: string | null } | null;
+  files?: Array<{ id: string; nameFile: string; url: string; createdAt?: string }>;
+  history?: Array<{ id: string; type: string; progress?: number | null; content?: string | null; createdAt: string; user?: { id: string; fullName: string } | null }>;
+}
+
+const normalizePriority = (priority?: string | null): TaskModel['priority'] => {
+  const normalized = (priority ?? '').toUpperCase();
+  if (normalized === 'CRITICAL') return 'Critical';
+  if (normalized === 'HIGH') return 'High';
+  if (normalized === 'MEDIUM') return 'Medium';
+  return 'Low';
+};
+
+const normalizeStatus = (status?: string | null): TaskModel['status'] => {
+  const normalized = (status ?? '').toUpperCase();
+  if (normalized === 'DOING') return 'Doing';
+  if (normalized === 'WAITING_APPROVAL') return 'UnderReview';
+  if (normalized === 'REJECTED') return 'Rejected';
+  if (normalized === 'DONE') return 'Completed';
+  if (normalized === 'OVERDUE') return 'Overdue';
+  return 'Todo';
+};
+
+const mapBackendTask = (task: BackendTaskDto): TaskModel => ({
+  id: String(task.id),
+  title: task.title ?? 'Chưa có tiêu đề',
+  description: task.description ?? undefined,
+  sender: task.assigner?.fullName ?? 'N/A',
+  status: normalizeStatus(task.status),
+  priority: normalizePriority(task.priority),
+  deadline: task.dueDate ?? '',
+  createdAt: task.createdAt,
+  progress: typeof task.progress === 'number' ? task.progress : undefined,
+  rejectionReason: task.rejectionReason ?? null,
+  files: task.files ?? [],
+  history: task.history ?? [],
+});
 
 const MOCK_MEETINGS: Meeting[] = [
   {
@@ -61,75 +84,99 @@ const MOCK_MESSAGES: ChatMessage[] = [
   {
     id: 'MSG-01',
     senderId: 'm-01',
-    senderName: 'Lê Trưởng Phòng',
-    content: '@Anh Tuấn Lưu ý sửa lại phần ngân sách trong bản dự thảo nhé.',
+    senderName: 'Manager',
+    content: '@Bạn lưu ý sửa lại phần ngân sách trong bản dự thảo nhé.',
     timestamp: '2024-04-27T09:00:00Z',
-    mentions: ['Anh Tuấn']
-  },
-  {
-    id: 'MSG-02',
-    senderId: 'm-02',
-    senderName: 'Nguyễn Chuyên Viên',
-    content: 'Đã gửi file kết quả xử lý lên hệ thống rồi ạ.',
-    timestamp: '2024-04-27T10:30:00Z'
+    mentions: ['Bạn']
   }
 ];
 
 export const specialistService = {
   getTasks: async (): Promise<TaskModel[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(MOCK_TASKS), 500);
-    });
+    const response = await axiosClient.get(ENDPOINTS.SPECIALIST.TASKS);
+    const payload = response.data as ApiResponse<BackendTaskDto[]>;
+    return (payload.data ?? []).map(mapBackendTask);
+  },
+
+  getTaskDetail: async (taskId: string): Promise<TaskModel> => {
+    const response = await axiosClient.get(ENDPOINTS.SPECIALIST.TASK_DETAIL(taskId));
+    const payload = response.data as ApiResponse<BackendTaskDto>;
+    return mapBackendTask(payload.data);
+  },
+
+  updateTaskProgressWithLog: async (taskId: string, progress: number, content?: string): Promise<boolean> => {
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress, content });
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
+
+  addDailyLog: async (taskId: string, content: string): Promise<boolean> => {
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.ADD_COMMENT(taskId), { content });
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
+
+  submitTask: async (taskId: string, submissionNotes: string, files: File[]): Promise<boolean> => {
+    const form = new FormData();
+    form.append('submissionNotes', submissionNotes);
+    files.forEach((file) => form.append('files', file));
+
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.SUBMIT(taskId), form);
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
+
+  resubmitTask: async (taskId: string, submissionNotes: string, files: File[]): Promise<boolean> => {
+    const form = new FormData();
+    form.append('submissionNotes', submissionNotes);
+    files.forEach((file) => form.append('files', file));
+
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.RESUBMIT(taskId), form);
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
+
+  deleteTaskFile: async (taskId: string, fileId: string): Promise<boolean> => {
+    const response = await axiosClient.delete(ENDPOINTS.SPECIALIST.DELETE_FILE(taskId, fileId));
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
   },
 
   getMeetings: async (): Promise<Meeting[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(MOCK_MEETINGS), 300);
-    });
+    return new Promise((resolve) => setTimeout(() => resolve(MOCK_MEETINGS), 300));
   },
 
   getMessages: async (): Promise<ChatMessage[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(MOCK_MESSAGES), 400);
-    });
-  },
-
-  updateTaskProgress: async (taskId: string, progress: number): Promise<boolean> => {
-    console.log(`Updating task ${taskId} progress to ${progress}%`);
-    return new Promise((resolve) => setTimeout(() => resolve(true), 300));
-  },
-
-  acceptTask: async (taskId: string): Promise<boolean> => {
-    console.log(`Accepting task ${taskId}`);
-    return new Promise((resolve) => setTimeout(() => resolve(true), 300));
-  },
-
-  completeTask: async (taskId: string): Promise<boolean> => {
-    console.log(`Completing task ${taskId}`);
-    return new Promise((resolve) => setTimeout(() => resolve(true), 300));
+    return new Promise((resolve) => setTimeout(() => resolve(MOCK_MESSAGES), 250));
   },
 
   aiDecoder: async (content: string): Promise<string> => {
     return new Promise((resolve) => {
-      setTimeout(() => resolve(`Giải mã từ AI: Dựa trên Điều 12 Luật CNTT, nội dung này yêu cầu...`), 1000);
+      setTimeout(() => resolve(`Giải mã từ AI: Dựa trên nội dung "${content.slice(0, 40)}"...`), 600);
     });
   },
 
   aiDraft: async (prompt: string): Promise<string> => {
     return new Promise((resolve) => {
-      setTimeout(() => resolve(`CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nBẢN DỰ THẢO: ${prompt}\n...`), 1500);
+      setTimeout(() => resolve(`BẢN DỰ THẢO: ${prompt}\n...`), 800);
     });
   },
 
   aiSearch: async (query: string): Promise<string[]> => {
     return new Promise((resolve) => {
-      setTimeout(() => resolve(['Hồ sơ chuyển đổi số 2023.pdf', 'Quy định ATTT v1.2.docx']), 800);
+      setTimeout(() => resolve([`Kết quả 1 cho: ${query}`, `Kết quả 2 cho: ${query}`]), 500);
     });
   },
-  
-  extractTasksFromDocument: async (file: File): Promise<string[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(['Soạn thảo tờ trình (Hạn 30/4)', 'Gửi email báo cáo (Hạn 2/5)']), 2000);
-    });
-  }
+
+  acceptTask: async (taskId: string): Promise<boolean> => {
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress: 1 });
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
+
+  completeTask: async (taskId: string): Promise<boolean> => {
+    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress: 100 });
+    const payload = response.data as ApiResponse<unknown>;
+    return payload.success;
+  },
 };

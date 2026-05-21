@@ -1,4 +1,4 @@
-
+﻿
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -8,7 +8,9 @@ import {
   Settings, 
   Bot, 
   Bell, 
-  ArrowRight 
+  ArrowRight,
+  Search,
+  CheckCircle
 } from 'lucide-react';
 import { SidebarItem, CopilotSuggestion } from '../components/common/SharedComponents';
 import { Role, User } from '../models/user';
@@ -26,6 +28,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, c
   const [users, setUsers] = useState<User[]>([]);
   const [isUserListOpen, setIsUserListOpen] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+
+  const roleLabels: Record<Role, string> = {
+    ADMIN: 'Quản trị',
+    LEADER: 'Lãnh đạo',
+    MANAGER: 'Trưởng phòng',
+    CLERICAL: 'Văn thư',
+    SPECIALIST: 'Chuyên viên',
+  };
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -46,6 +57,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, c
   const sortedUsers = useMemo(() => {
     return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
   }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const keyword = userSearch.trim().toLowerCase();
+
+    if (!keyword) {
+      return sortedUsers;
+    }
+
+    return sortedUsers.filter((user) => {
+      return (
+        user.fullName.toLowerCase().includes(keyword) ||
+        user.email?.toLowerCase().includes(keyword) ||
+        user.role.toLowerCase().includes(keyword)
+      );
+    });
+  }, [sortedUsers, userSearch]);
 
   const handleSelectUser = (nextUserId: string) => {
     if (!nextUserId || nextUserId === currentUser.id) {
@@ -72,30 +99,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, c
             active={isUserListOpen}
           />
 
-          {isUserListOpen && (
-            <div className="mx-2 p-2 rounded-lg border border-teams-border bg-white/90 space-y-2">
-              <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide px-1">
-                Chọn người dùng
-              </div>
-
-              <select
-                value={currentUser.id}
-                onChange={(event) => handleSelectUser(event.target.value)}
-                disabled={isLoadingUsers || sortedUsers.length === 0}
-                className="w-full rounded border border-teams-border px-2 py-1.5 text-[11px] text-text-main bg-white outline-none focus:border-teams-purple"
-                title="Chọn người dùng"
-              >
-                {isLoadingUsers && <option>Đang tải người dùng...</option>}
-                {!isLoadingUsers && sortedUsers.length === 0 && <option>Không có dữ liệu user</option>}
-                {!isLoadingUsers &&
-                  sortedUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.fullName} - {user.role}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
           <SidebarItem icon={<Settings size={18} />} label="Cài đặt" />
         </div>
 
@@ -111,6 +114,94 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentUser, c
           </div>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {isUserListOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Đóng danh sách người dùng"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-30 bg-transparent"
+              onClick={() => setIsUserListOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, x: -8, scale: 0.98 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -8, scale: 0.98 }}
+              transition={{ duration: 0.16 }}
+              className="fixed left-20 top-28 z-40 w-80 overflow-hidden rounded-lg border border-teams-border bg-white shadow-2xl shadow-slate-900/15"
+            >
+              <div className="border-b border-teams-border bg-gray-50 px-4 py-3">
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Đổi người dùng</div>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teams-purple text-sm font-black text-white">
+                    {currentUser.fullName.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-text-main">{currentUser.fullName}</div>
+                    <div className="mt-0.5 text-[10px] font-bold uppercase text-teams-purple">
+                      {roleLabels[currentUser.role] ?? currentUser.role}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    placeholder="Tìm theo tên, email hoặc vai trò..."
+                    className="h-9 w-full rounded-md border border-teams-border bg-white pl-9 pr-3 text-xs font-medium text-text-main outline-none transition-colors placeholder:text-gray-400 focus:border-teams-purple"
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto px-2 pb-2 custom-scrollbar">
+                {isLoadingUsers && (
+                  <div className="px-3 py-6 text-center text-xs font-bold text-text-secondary">Đang tải người dùng...</div>
+                )}
+                {!isLoadingUsers && filteredUsers.length === 0 && (
+                  <div className="px-3 py-6 text-center text-xs font-bold text-text-secondary">Không tìm thấy người dùng</div>
+                )}
+                {!isLoadingUsers &&
+                  filteredUsers.map((user) => {
+                    const isCurrent = user.id === currentUser.id;
+
+                    return (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => handleSelectUser(user.id)}
+                        className={`mb-1 flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
+                          isCurrent ? 'bg-teams-purple/10 text-teams-purple' : 'text-text-main hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                          isCurrent ? 'bg-teams-purple text-white' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {user.fullName.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-black">{user.fullName}</div>
+                          <div className="truncate text-[10px] font-medium text-text-secondary">{user.email || roleLabels[user.role]}</div>
+                        </div>
+                        <span className="shrink-0 rounded bg-gray-100 px-2 py-1 text-[9px] font-black uppercase text-gray-500">
+                          {roleLabels[user.role] ?? user.role}
+                        </span>
+                        {isCurrent && <CheckCircle size={16} className="shrink-0 text-teams-purple" />}
+                      </button>
+                    );
+                  })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">

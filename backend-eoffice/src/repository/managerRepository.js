@@ -8,25 +8,10 @@ async function createTask(payload = {}) {
     return null;
 }
 
-async function getTaskById(taskId) {
-    void taskId;
-    return null;
-}
-
 async function receiveTaskFromLeader(taskId, payload = {}) {
     void taskId;
     void payload;
     return null;
-}
-
-async function getTaskProgress(taskId) {
-    void taskId;
-    return null;
-}
-
-async function getProgressReports(taskId) {
-    void taskId;
-    return [];
 }
 
 async function updateTaskStatus(taskId, payload = {}) {
@@ -53,21 +38,12 @@ async function rejectTask(taskId, payload = {}) {
     return null;
 }
 
-async function getTasksByDepartmentId(departmentId) {
-    void departmentId;
-    return [];
-}
-
 module.exports = {
     getAllTasks,
     createTask,
-    getTaskById,
     receiveTaskFromLeader,
-    getTaskProgress,
-    getProgressReports,
     updateTaskStatus,
     cancelTask,
     approveTask,
-    rejectTask,
-    getTasksByDepartmentId
+    rejectTask
 };

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Bot, ArrowRight, Clock, CheckCircle, TrendingUp, AlertCircle, Plus } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { DocumentTask } from '../../types';
 
 export function SidebarItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {

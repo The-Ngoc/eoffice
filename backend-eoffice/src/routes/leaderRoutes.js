@@ -1,7 +1,5 @@
 const express = require('express');
 const leaderController = require('../controllers/leaderController');
-const checkRole = require('../middleware/checkRole');
-const { ROLES } = require('../constants/enums');
 
 const router = express.Router();
 

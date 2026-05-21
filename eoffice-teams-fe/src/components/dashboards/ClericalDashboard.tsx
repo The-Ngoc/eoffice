@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText,
@@ -74,6 +74,9 @@ const getFlowHistoryTimestamp = (item: DocumentFlowHistoryItem): number => {
   return 0;
 };
 
+type NewDocumentField = 'documentNumber' | 'symbol' | 'title' | 'sender' | 'summary';
+type NewDocumentErrors = Partial<Record<NewDocumentField, string>>;
+
 export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [documents, setDocuments] = useState<ClericalDocument[]>([]);
   const [activeTab, setActiveTab] = useState<ClericalDocumentStatus | 'All'>('All');
@@ -104,6 +107,60 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     summary: '',
     legalWarning: false,
   });
+  const [newDocErrors, setNewDocErrors] = useState<NewDocumentErrors>({});
+
+  const updateNewDocField = <K extends keyof CreateDocumentPayload>(field: K, value: CreateDocumentPayload[K]) => {
+    setNewDocForm((current) => ({ ...current, [field]: value }));
+
+    if (field in newDocErrors) {
+      setNewDocErrors((current) => {
+        const next = { ...current };
+        delete next[field as NewDocumentField];
+        return next;
+      });
+    }
+  };
+
+  const validateNewDocument = (): NewDocumentErrors => {
+    const errors: NewDocumentErrors = {};
+
+    if (!newDocForm.documentNumber.trim()) {
+      errors.documentNumber = 'Vui lòng nhập số hiệu văn bản.';
+    }
+
+    if (!newDocForm.symbol.trim()) {
+      errors.symbol = 'Vui lòng nhập ký hiệu văn bản.';
+    }
+
+    if (!newDocForm.sender.trim()) {
+      errors.sender = 'Vui lòng nhập đơn vị gửi.';
+    }
+
+    if (!newDocForm.title.trim()) {
+      errors.title = 'Vui lòng nhập tiêu đề văn bản.';
+    }
+
+    if (!newDocForm.summary.trim()) {
+      errors.summary = 'Vui lòng nhập tóm tắt nội dung.';
+    }
+
+    return errors;
+  };
+
+  const getNewDocFieldClass = (field: NewDocumentField) => {
+    const baseClass = 'w-full px-3 py-2 border rounded text-sm outline-none transition-colors';
+    return newDocErrors[field]
+      ? `${baseClass} border-red-300 bg-red-50/50 focus:border-red-500`
+      : `${baseClass} border-teams-border focus:border-teams-purple`;
+  };
+
+  const renderNewDocError = (field: NewDocumentField) => {
+    if (!newDocErrors[field]) {
+      return null;
+    }
+
+    return <p className="text-[10px] font-semibold text-red-600">{newDocErrors[field]}</p>;
+  };
 
   const fetchDocuments = async () => {
     setIsLoading(true);
@@ -219,14 +276,17 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleCreateDocument = async () => {
-    if (!newDocForm.documentNumber || !newDocForm.symbol || !newDocForm.title || !newDocForm.sender || !newDocForm.summary) {
-      setErrorMessage('Vui lòng nhập đầy đủ: Số hiệu, Ký hiệu, Tiêu đề, Đơn vị gửi và Tóm tắt nội dung.');
+    const validationErrors = validateNewDocument();
+    if (Object.keys(validationErrors).length > 0) {
+      setNewDocErrors(validationErrors);
+      setErrorMessage(null);
       return;
     }
 
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setNewDocErrors({});
 
     try {
       const response = await createDocument(newDocForm, selectedFiles);
@@ -510,7 +570,11 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 />
               </div>
               <button
-                onClick={() => setIsUploadModalOpen(true)}
+                onClick={() => {
+                  setNewDocErrors({});
+                  setErrorMessage(null);
+                  setIsUploadModalOpen(true);
+                }}
                 className="btn-primary flex items-center gap-2 px-4 py-1.5 shadow-sm"
               >
                 <Upload size={16} />
@@ -877,20 +941,24 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     <input
                       type="text"
                       value={newDocForm.documentNumber}
-                      onChange={(event) => setNewDocForm((current) => ({ ...current, documentNumber: event.target.value }))}
-                      className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
+                      onChange={(event) => updateNewDocField('documentNumber', event.target.value)}
+                      className={getNewDocFieldClass('documentNumber')}
                       placeholder="123..."
+                      aria-invalid={Boolean(newDocErrors.documentNumber)}
                     />
+                    {renderNewDocError('documentNumber')}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Ký hiệu</label>
                     <input
                       type="text"
                       value={newDocForm.symbol}
-                      onChange={(event) => setNewDocForm((current) => ({ ...current, symbol: event.target.value }))}
-                      className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
+                      onChange={(event) => updateNewDocField('symbol', event.target.value)}
+                      className={getNewDocFieldClass('symbol')}
                       placeholder="CV-VP..."
+                      aria-invalid={Boolean(newDocErrors.symbol)}
                     />
+                    {renderNewDocError('symbol')}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Loại văn bản</label>
@@ -925,10 +993,12 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <input
                     type="text"
                     value={newDocForm.sender}
-                    onChange={(event) => setNewDocForm((current) => ({ ...current, sender: event.target.value }))}
-                    className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
+                    onChange={(event) => updateNewDocField('sender', event.target.value)}
+                    className={getNewDocFieldClass('sender')}
                     placeholder="Tên phòng ban/đơn vị gửi..."
+                    aria-invalid={Boolean(newDocErrors.sender)}
                   />
+                  {renderNewDocError('sender')}
                 </div>
 
                 <div className="space-y-1">
@@ -936,20 +1006,24 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <input
                     type="text"
                     value={newDocForm.title}
-                    onChange={(event) => setNewDocForm((current) => ({ ...current, title: event.target.value }))}
-                    className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple"
+                    onChange={(event) => updateNewDocField('title', event.target.value)}
+                    className={getNewDocFieldClass('title')}
                     placeholder="Tiêu đề chính của văn bản..."
+                    aria-invalid={Boolean(newDocErrors.title)}
                   />
+                  {renderNewDocError('title')}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Tóm tắt nội dung</label>
                   <textarea
                     value={newDocForm.summary}
-                    onChange={(event) => setNewDocForm((current) => ({ ...current, summary: event.target.value }))}
-                    className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none focus:border-teams-purple h-24"
+                    onChange={(event) => updateNewDocField('summary', event.target.value)}
+                    className={`${getNewDocFieldClass('summary')} h-24`}
                     placeholder="Tóm tắt ngắn gọn nội dung văn bản..."
+                    aria-invalid={Boolean(newDocErrors.summary)}
                   ></textarea>
+                  {renderNewDocError('summary')}
                 </div>
 
                 <label className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-all">
@@ -971,6 +1045,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   onClick={() => {
                     setIsUploadModalOpen(false);
                     setSelectedFiles([]);
+                    setNewDocErrors({});
                   }}
                   className="px-4 py-2 text-sm font-bold text-text-secondary hover:underline"
                 >

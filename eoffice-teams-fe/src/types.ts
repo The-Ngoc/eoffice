@@ -78,11 +78,15 @@ export interface TaskModel {
   title: string;
   description?: string;
   sender: string;
-  status: 'Todo' | 'Doing' | 'Completed' | 'Overdue';
+  status: 'Todo' | 'Doing' | 'UnderReview' | 'Rejected' | 'Completed' | 'Overdue';
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
   deadline: string;
   createdAt?: string;
   assigneeId?: string;
+  progress?: number;
+  rejectionReason?: string | null;
+  files?: Array<{ id: string; nameFile: string; url: string; createdAt?: string }>;
+  history?: Array<{ id: string; type: string; progress?: number | null; content?: string | null; createdAt: string; user?: { id: string; fullName: string } | null }>;
   aiSummary?: string;
   attachments?: string[];
   departmentName?: string;
