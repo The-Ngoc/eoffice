@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const app = require('./src/app');
@@ -53,23 +53,20 @@ function mapRoleFromJobTitle(jobTitle, emptyRoleIndex) {
     return ROLES.SPECIALIST;
 }
 
-
 async function startServer() {
     try {
         await sequelize.authenticate();
-        console.log('✅ Kết nối DB thành công.');
 
-        // await sequelize.sync({ alter: true });
-        // console.log('✅ Database đã được đồng bộ hóa.');
-
-        // await seedInitialData();
-        // console.log('✅ Đã nạp dữ liệu mẫu thành công.');
+        if (String(process.env.DB_SYNC || '').trim().toLowerCase() === 'true') {
+            await sequelize.sync({ alter: true });
+            console.log('✅ Database đã được đồng bộ hóa (DB_SYNC=true).');
+        }
 
         app.listen(PORT, () => {
-            console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
+            console.log(`http://localhost:${PORT}`);
         });
     } catch (err) {
-        console.error('❌ Lỗi khởi động:', err);
+        console.error(':', err);
         process.exit(1);
     }
 }

@@ -1,5 +1,4 @@
 const managerRepository = require('../repository/managerRepository');
-const taskDepartmentService = require('./taskDepartmentService');
 
 function createSkeletonResponse(name) {
     return {
@@ -18,10 +17,6 @@ async function createTask(payload = {}) {
     void payload;
     await managerRepository.createTask(payload);
     return createSkeletonResponse('createTask');
-}
-
-async function getTaskById(taskId) {
-    return taskDepartmentService.getTaskById(taskId);
 }
 
 async function receiveTaskFromLeader(taskId, payload = {}) {
@@ -71,11 +66,9 @@ async function rejectTask(taskId, payload = {}) {
     return createSkeletonResponse('rejectTask');
 }
 
-
 module.exports = {
     getAllTasks,
     createTask,
-    getTaskById,
     receiveTaskFromLeader,
     getTaskProgress,
     getProgressReports,

@@ -37,6 +37,11 @@ const Task = sequelize.define('Task', {
         allowNull: false,
         defaultValue: TASK_STATUS.TODO
     },
+    progress: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
     priority: {
         type: DataTypes.ENUM(Object.values(PRIORITY)),
         allowNull: true,
@@ -56,6 +61,11 @@ const Task = sequelize.define('Task', {
     note: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    rejectionReason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: 'rejection_reason'
     }
 }, {
     tableName: 'tasks',
@@ -81,6 +91,11 @@ Task.associate = (models) => {
     Task.hasMany(models.TaskFile, {
         foreignKey: 'taskId',
         as: 'files'
+    });
+
+    Task.hasMany(models.TaskHistory, {
+        foreignKey: 'taskId',
+        as: 'history'
     });
 };
 

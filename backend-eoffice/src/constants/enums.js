@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Centralized Enums for eOffice System
  * Ensures consistency across all modules
  */
@@ -13,11 +13,11 @@ const ROLES = {
 };
 
 const ROLE_DISPLAY = {
-  ADMIN: 'Quản trị viên',
-  LEADER: 'Lãnh đạo',
-  MANAGER: 'Trưởng phòng',
-  CLERICAL: 'Văn thư',
-  SPECIALIST: 'Chuyên viên'
+  ADMIN: 'Quáº£n trá»‹ viÃªn',
+  LEADER: 'LÃ£nh Ä‘áº¡o',
+  MANAGER: 'TrÆ°á»Ÿng phÃ²ng',
+  CLERICAL: 'VÄƒn thÆ°',
+  SPECIALIST: 'ChuyÃªn viÃªn'
 };
 
 // Role hierarchy for authorization
@@ -31,58 +31,60 @@ const ROLE_HIERARCHY = {
 
 // ============ DOCUMENT STATUS ============
 const DOCUMENT_STATUS = {
-  DRAFT: 'DRAFT',                    // Nháp (chỉ vaên thư)
-  PENDING_LEADER: 'PENDING_LEADER',  // Chờ lãnh đạo duyệt
-  APPROVED: 'APPROVED',              // Đã duyệt, chờ giao việc
-  ASSIGNED: 'ASSIGNED',              // Đã giao phòng ban
-  PROCESSING: 'PROCESSING',          // Phòng ban đang xử lý
-  COMPLETED: 'COMPLETED',            // Hoàn thành
-  REJECTED: 'REJECTED'               // Từ chối
+  DRAFT: 'DRAFT',                    // NhÃ¡p (chá»‰ vaÃªn thÆ°)
+  PENDING_LEADER: 'PENDING_LEADER',  // Chá» lÃ£nh Ä‘áº¡o duyá»‡t
+  APPROVED: 'APPROVED',              // ÄÃ£ duyá»‡t, chá» giao viá»‡c
+  ASSIGNED: 'ASSIGNED',              // ÄÃ£ giao phÃ²ng ban
+  PROCESSING: 'PROCESSING',          // PhÃ²ng ban Ä‘ang xá»­ lÃ½
+  COMPLETED: 'COMPLETED',            // HoÃ n thÃ nh
+  REJECTED: 'REJECTED'               // Tá»« chá»‘i
 };
 
 const DOCUMENT_STATUS_DISPLAY = {
-  DRAFT: 'Nháp',
-  PENDING_LEADER: 'Chờ duyệt',
-  APPROVED: 'Đã duyệt',
-  ASSIGNED: 'Đã giao phòng',
-  PROCESSING: 'Đang xử lý',
-  COMPLETED: 'Hoàn thành',
-  REJECTED: 'Từ chối'
+  DRAFT: 'NhÃ¡p',
+  PENDING_LEADER: 'Chá» duyá»‡t',
+  APPROVED: 'ÄÃ£ duyá»‡t',
+  ASSIGNED: 'ÄÃ£ giao phÃ²ng',
+  PROCESSING: 'Äang xá»­ lÃ½',
+  COMPLETED: 'HoÃ n thÃ nh',
+  REJECTED: 'Tá»« chá»‘i'
 };
 
 // ============ DOCUMENT DIRECTION ============
 const DOCUMENT_DIRECTION = {
-  INBOUND: 'INBOUND',    // Văn bản đến
-  OUTBOUND: 'OUTBOUND'   // Văn bản đi
+  INBOUND: 'INBOUND',    // VÄƒn báº£n Ä‘áº¿n
+  OUTBOUND: 'OUTBOUND'   // VÄƒn báº£n Ä‘i
 };
 
 // ============ DOCUMENT TYPE ============
 const DOCUMENT_TYPE = {
-  OFFICIAL: 'OFFICIAL',           // Công văn
-  DECISION: 'DECISION',           // Quyết định
-  RESOLUTION: 'RESOLUTION',       // Nghị quyết
-  DISPATCH: 'DISPATCH',           // Chỉ thị
-  CONTRACT: 'CONTRACT',           // Hợp đồng
-  FORM: 'FORM',                   // Biểu mẫu
-  REQUEST: 'REQUEST',             // Đơn yêu cầu
-  REPORT: 'REPORT'                // Báo cáo
+  OFFICIAL: 'OFFICIAL',           // CÃ´ng vÄƒn
+  DECISION: 'DECISION',           // Quyáº¿t Ä‘á»‹nh
+  RESOLUTION: 'RESOLUTION',       // Nghá»‹ quyáº¿t
+  DISPATCH: 'DISPATCH',           // Chá»‰ thá»‹
+  CONTRACT: 'CONTRACT',           // Há»£p Ä‘á»“ng
+  FORM: 'FORM',                   // Biá»ƒu máº«u
+  REQUEST: 'REQUEST',             // ÄÆ¡n yÃªu cáº§u
+  REPORT: 'REPORT'                // BÃ¡o cÃ¡o
 };
 
 // ============ TASK STATUS ============
 const TASK_STATUS = {
-  TODO: 'TODO',                  // Chưa làm
-  DOING: 'DOING',                // Đang làm
-  WAITING_APPROVAL: 'WAITING_APPROVAL',  // Chờ duyệt
+  TODO: 'TODO',                  // ChÆ°a lÃ m
+  DOING: 'DOING',                // Äang lÃ m
+  WAITING_APPROVAL: 'WAITING_APPROVAL',  // Chá» duyá»‡t
+  REJECTED: 'REJECTED',          // Tu choi (manager reject)
   DONE: 'DONE',                  // Xong
-  OVERDUE: 'OVERDUE'             // Quá hạn (virtual)
+  OVERDUE: 'OVERDUE'             // QuÃ¡ háº¡n (virtual)
 };
 
 const TASK_STATUS_DISPLAY = {
-  TODO: 'Chưa làm',
-  DOING: 'Đang làm',
-  WAITING_APPROVAL: 'Chờ duyệt',
+  TODO: 'ChÆ°a lÃ m',
+  DOING: 'Äang lÃ m',
+  WAITING_APPROVAL: 'Chá» duyá»‡t',
+  REJECTED: 'Tu choi',
   DONE: 'Xong',
-  OVERDUE: 'Quá hạn'
+  OVERDUE: 'QuÃ¡ háº¡n'
 };
 
 // ============ PRIORITY ============
@@ -94,17 +96,17 @@ const PRIORITY = {
 };
 
 const PRIORITY_DISPLAY = {
-  LOW: 'Thường',
-  MEDIUM: 'Khẩn',
-  HIGH: 'Hỏa tốc',
-  CRITICAL: 'Cực kỳ khẩn'
+  LOW: 'ThÆ°á»ng',
+  MEDIUM: 'Kháº©n',
+  HIGH: 'Há»a tá»‘c',
+  CRITICAL: 'Cá»±c ká»³ kháº©n'
 };
 
 // Map from urgency to priority
 const URGENCY_TO_PRIORITY = {
-  'Thường': PRIORITY.LOW,
-  'Khẩn': PRIORITY.HIGH,
-  'Hỏa tốc': PRIORITY.CRITICAL
+  'ThÆ°á»ng': PRIORITY.LOW,
+  'Kháº©n': PRIORITY.HIGH,
+  'Há»a tá»‘c': PRIORITY.CRITICAL
 };
 
 // ============ SIGNATURE STATUS ============
@@ -137,37 +139,37 @@ const SECURITY_LEVEL = {
 };
 
 const SECURITY_LEVEL_DISPLAY = {
-  PUBLIC: 'Công khai',
-  INTERNAL: 'Nội bộ',
-  CONFIDENTIAL: 'Mật',
-  SECRET: 'Tối mật'
+  PUBLIC: 'CÃ´ng khai',
+  INTERNAL: 'Ná»™i bá»™',
+  CONFIDENTIAL: 'Máº­t',
+  SECRET: 'Tá»‘i máº­t'
 };
 
 // ============ FILE UPLOAD STATUS ============
 const FILE_UPLOAD_STATUS = {
-  PENDING: 'PENDING',           // Chờ upload (file chưa được gửi lên Cloudinary)
-  UPLOADING: 'UPLOADING',       // Đang upload (file đang được gửi)
-  UPLOADED: 'UPLOADED',         // Đã upload (file tải lên Cloudinary thành công)
-  FAILED: 'FAILED'              // Thất bại (upload thất bại, cần retry)
+  PENDING: 'PENDING',           // Chá» upload (file chÆ°a Ä‘Æ°á»£c gá»­i lÃªn Cloudinary)
+  UPLOADING: 'UPLOADING',       // Äang upload (file Ä‘ang Ä‘Æ°á»£c gá»­i)
+  UPLOADED: 'UPLOADED',         // ÄÃ£ upload (file táº£i lÃªn Cloudinary thÃ nh cÃ´ng)
+  FAILED: 'FAILED'              // Tháº¥t báº¡i (upload tháº¥t báº¡i, cáº§n retry)
 };
 
 const FILE_UPLOAD_STATUS_DISPLAY = {
-  PENDING: 'Chờ upload',
-  UPLOADING: 'Đang upload',
-  UPLOADED: 'Đã upload',
-  FAILED: 'Thất bại'
+  PENDING: 'Chá» upload',
+  UPLOADING: 'Äang upload',
+  UPLOADED: 'ÄÃ£ upload',
+  FAILED: 'Tháº¥t báº¡i'
 };
 
 // ============ SUPPORTED FILE TYPES ============
 const SUPPORTED_FILE_TYPES = {
-  PDF: 'application/pdf',           // Tài liệu PDF
-  PNG: 'image/png',                 // Hình ảnh PNG
-  JPG: 'image/jpeg',                // Hình ảnh JPEG
-  JPEG: 'image/jpeg',               // Hình ảnh JPEG (alias)
-  DOC: 'application/msword',        // Tài liệu Word
-  DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // Tài liệu Word mới
-  XLS: 'application/vnd.ms-excel',  // Bảng tính Excel
-  XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // Bảng tính Excel mới
+  PDF: 'application/pdf',           // TÃ i liá»‡u PDF
+  PNG: 'image/png',                 // HÃ¬nh áº£nh PNG
+  JPG: 'image/jpeg',                // HÃ¬nh áº£nh JPEG
+  JPEG: 'image/jpeg',               // HÃ¬nh áº£nh JPEG (alias)
+  DOC: 'application/msword',        // TÃ i liá»‡u Word
+  DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // TÃ i liá»‡u Word má»›i
+  XLS: 'application/vnd.ms-excel',  // Báº£ng tÃ­nh Excel
+  XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // Báº£ng tÃ­nh Excel má»›i
 };
 
 // ============ VALIDATORS ============
