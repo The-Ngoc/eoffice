@@ -128,6 +128,7 @@ export const getDocumentAttachments = async (id: string): Promise<DocumentAttach
 
 // Fetch flow history by document id
 export const getDocumentFlowHistory = async (id: string): Promise<ApiResponse<DocumentFlowHistoryResponse>> => {
-  const response = await axiosClient.get(`${ENDPOINTS.DOCUMENTS.FLOW_HISTORY}/${id}`);
+  // Backend exposes flow history at /api/documents/:documentId/flow-history
+  const response = await axiosClient.get(`/api/documents/${id}/flow-history`);
   return response.data as ApiResponse<DocumentFlowHistoryResponse>;
 };

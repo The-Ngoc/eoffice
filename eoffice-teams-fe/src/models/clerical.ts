@@ -99,6 +99,11 @@ const normalizeStatus = (status?: string): ClericalDocumentStatus => {
     return 'WAITING_PUBLISH';
   }
 
+  // Backend may return 'APPROVED' after leader approval — map it to waiting-publish
+  if (normalized === 'APPROVED') {
+    return 'WAITING_PUBLISH';
+  }
+
   if (normalized === 'PUBLISHED') {
     return 'PUBLISHED';
   }

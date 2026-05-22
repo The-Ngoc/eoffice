@@ -75,6 +75,18 @@ const getFlowHistoryTimestamp = (item: DocumentFlowHistoryItem): number => {
   return 0;
 };
 
+const normalizeHistoryStatus = (status?: string): ClericalFlowStepStatus => {
+  if (!status) return 'Next';
+  const normalized = status.toUpperCase();
+  if (normalized.includes('DONE') || normalized.includes('COMPLETED') || normalized.includes('APPROVED')) {
+    return 'Done';
+  }
+  if (normalized.includes('CURRENT') || normalized.includes('IN_PROGRESS') || normalized.includes('PROCESS')) {
+    return 'Current';
+  }
+  return 'Next';
+};
+
 type NewDocumentField = 'documentNumber' | 'symbol' | 'title' | 'sender' | 'summary';
 type NewDocumentErrors = Partial<Record<NewDocumentField, string>>;
 
@@ -97,6 +109,9 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [flowHistory, setFlowHistory] = useState<DocumentFlowHistoryItem[]>([]);
+  const [isFlowHistoryLoading, setIsFlowHistoryLoading] = useState(false);
+  const [flowHistoryError, setFlowHistoryError] = useState<string | null>(null);
 
   const [newDocForm, setNewDocForm] = useState<CreateDocumentPayload>({
     documentNumber: '',
@@ -247,6 +262,82 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     });
   }, [selectedDoc]);
 
+  // Fetch flow history from backend whenever selected document changes
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedDocId) {
+      setFlowHistory([]);
+      return;
+    }
+
+    setIsFlowHistoryLoading(true);
+    setFlowHistoryError(null);
+
+    (async () => {
+      try {
+        const resp = await getDocumentFlowHistory(selectedDocId);
+        const payload = resp.data;
+        const items = payload?.flow_history ?? [];
+        if (!cancelled) {
+          setFlowHistory(items);
+        }
+      } catch (err) {
+        console.error('Failed to fetch flow history:', err);
+        if (!cancelled) setFlowHistoryError('Không thể tải lịch sử xử lý.');
+      } finally {
+        if (!cancelled) setIsFlowHistoryLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDocId]);
+
+  const displayFlowHistory = useMemo(() => {
+    if (!flowHistory || flowHistory.length === 0) return [];
+
+    return [...flowHistory]
+      .sort((a, b) => getFlowHistoryTimestamp(b) - getFlowHistoryTimestamp(a))
+      .map((item) => ({
+        id: String(item.id),
+        action: item.action ?? item.note ?? 'Đang cập nhật',
+        time: formatFlowHistoryDate(item.processedAt ?? item.updatedAt ?? item.createdAt),
+        user: item.managerId ?? item.departmentId ?? '',
+        status: normalizeHistoryStatus(item.status),
+      }));
+  }, [flowHistory]);
+
+  // Load attachments for selected document
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedDocId) {
+      setAttachments([]);
+      setAttachmentError(null);
+      return;
+    }
+
+    setIsLoadingAttachments(true);
+    setAttachmentError(null);
+
+    (async () => {
+      try {
+        const files = await getDocumentAttachments(selectedDocId);
+        const filesArray = Array.isArray(files) ? files : ((files as any).data || []);
+        if (!cancelled) setAttachments(filesArray as DocumentAttachment[]);
+      } catch (err) {
+        console.error('Failed to load attachments', err);
+        if (!cancelled) setAttachmentError('Không thể tải tệp đính kèm. Vui lòng thử lại.');
+      } finally {
+        if (!cancelled) setIsLoadingAttachments(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDocId]);
+
   const [showPublishVerification, setShowPublishVerification] = useState(false);
   const [isPublishVerified, setIsPublishVerified] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -363,6 +454,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
         currentDocs.map((doc) => (doc.id === submitted.id ? submitted : doc)),
       );
       setSelectedDocId(submitted.id);
+      // switch to the tab matching the updated status so the document appears in the correct box
+      setActiveTab(submitted.status as ClericalDocumentStatus | 'All');
       setSuccessMessage('Văn bản đã được trình lên Lãnh đạo và đang chờ duyệt.');
     } catch (error) {
       setErrorMessage('Không thể trình văn bản lên Lãnh đạo. Vui lòng thử lại.');
@@ -400,6 +493,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
 
       setDocuments((currentDocs) => currentDocs.map((d) => (d.id === updated.id ? updated : d)));
       setSelectedDocId(updated.id);
+      // ensure published document moves to the 'PUBLISHED' tab
+      setActiveTab(updated.status as ClericalDocumentStatus | 'All');
       setSuccessMessage('Văn bản đã được ban hành.');
       setShowPublishVerification(false);
       setIsPublishVerified(false);
@@ -699,24 +794,47 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </h4>
                     <div className="space-y-6 relative ml-3">
                       <div className="absolute -left-3.25 top-2 bottom-2 w-0.5 bg-gray-100"></div>
-                      {displayFlow.map((step) => (
-                        <div key={step.id} className="relative flex flex-col pl-4">
-                          <FlowStepDot status={step.status} />
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-text-main">{step.action}</span>
-                            <span className="text-[10px] text-gray-400">{step.time}</span>
+                      {isFlowHistoryLoading ? (
+                        <div className="p-2 text-xs text-text-secondary">Đang tải lịch sử xử lý...</div>
+                      ) : flowHistoryError ? (
+                        <div className="p-2 text-xs text-red-600">{flowHistoryError}</div>
+                      ) : displayFlowHistory.length > 0 ? (
+                        displayFlowHistory.map((step) => (
+                          <div key={step.id} className="relative flex flex-col pl-4">
+                            <FlowStepDot status={step.status} />
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-main">{step.action}</span>
+                              <span className="text-[10px] text-gray-400">{step.time}</span>
+                            </div>
+                            <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              {step.status === 'Current'
+                                ? 'Đang thực hiện'
+                                : step.status === 'Done'
+                                  ? 'Đã hoàn tất'
+                                  : 'Chờ xử lý'}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
-                          <span className="text-[10px] text-gray-400 mt-0.5">
-                            {step.status === 'Current'
-                              ? 'Đang thực hiện'
-                              : step.status === 'Done'
-                                ? 'Đã hoàn tất'
-                                : 'Chờ xử lý'}
-                          </span>
-                        </div>
-                      ))}
-                      {displayFlow.length === 0 && (
+                        ))
+                      ) : displayFlow.length > 0 ? (
+                        displayFlow.map((step) => (
+                          <div key={step.id} className="relative flex flex-col pl-4">
+                            <FlowStepDot status={step.status} />
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-main">{step.action}</span>
+                              <span className="text-[10px] text-gray-400">{step.time}</span>
+                            </div>
+                            <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              {step.status === 'Current'
+                                ? 'Đang thực hiện'
+                                : step.status === 'Done'
+                                  ? 'Đã hoàn tất'
+                                  : 'Chờ xử lý'}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
                         <p className="text-xs text-text-secondary">Chưa có lịch sử xử lý.</p>
                       )}
                     </div>
