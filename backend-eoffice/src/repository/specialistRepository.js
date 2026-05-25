@@ -1,6 +1,5 @@
 const Task = require('../models/taskModel');
 const TaskFile = require('../models/taskFileModel');
-const TaskHistory = require('../models/taskHistoryModel');
 const DepartmentMember = require('../models/departmentMemberModel');
 const Document = require('../models/documentModel');
 const User = require('../models/userModel');
@@ -37,41 +36,34 @@ async function findTaskDetail(taskId) {
             },
             { model: Document, as: 'document', attributes: ['id', 'documentNumber', 'title'] },
             { model: TaskFile, as: 'files', attributes: ['id', 'nameFile', 'url', 'createdAt'] },
-            {
-                model: TaskHistory,
-                as: 'history',
-                attributes: ['id', 'type', 'progress', 'content', 'createdAt'],
-                include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'role'] }]
-            }
-        ],
-        order: [
-            [{ model: TaskHistory, as: 'history' }, 'createdAt', 'DESC']
+
         ]
     });
 }
 
-async function updateTaskById(taskId, payload) {
+async function updateTaskById(taskId, payload, options = {}) {
     const task = await Task.findByPk(taskId);
     if (!task) return null;
-    await task.update(payload);
+    await task.update(payload, options);
     return task;
 }
 
-async function createTaskHistory(payload) {
-    return TaskHistory.create(payload);
+async function deleteTaskFiles(taskId, options = {}) {
+    return TaskFile.destroy({ where: { taskId }, transaction: options.transaction });
 }
 
-async function deleteTaskFiles(taskId) {
-    return TaskFile.destroy({ where: { taskId } });
-}
-
-async function addTaskFiles(files = []) {
+async function addTaskFiles(files = [], options = {}) {
     if (!files.length) return [];
-    return TaskFile.bulkCreate(files);
+    return TaskFile.bulkCreate(files, options);
 }
 
 async function deleteTaskFileById(taskId, fileId) {
     return TaskFile.destroy({ where: { id: fileId, taskId } });
+}
+
+async function findUserById(userId) {
+    if (!userId) return null;
+    return User.findByPk(userId, { attributes: ['id', 'role', 'fullName', 'email'] });
 }
 
 module.exports = {
@@ -79,9 +71,9 @@ module.exports = {
     findTasksByMemberId,
     findTaskDetail,
     updateTaskById,
-    createTaskHistory,
     deleteTaskFiles,
     addTaskFiles,
-    deleteTaskFileById
+    deleteTaskFileById,
+    findUserById
 };
 

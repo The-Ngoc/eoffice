@@ -1,5 +1,7 @@
 const leaderRepository = require('../repository/leaderRepository');
 const taskDepartmentRepository = require('../repository/taskDepartmentRepository');
+const documentRepository = require('../repository/documentRepository');
+const sequelize = require('../config/db');
 const { DOCUMENT_STATUS } = require('../constants/enums');
 
 const VALID_STATUSES = Object.values(DOCUMENT_STATUS);
@@ -195,35 +197,50 @@ async function assignDepartmentTask(payload = {}) {
         throw createValidationError('managerId là bắt buộc');
     }
 
-    const document = await leaderRepository.findDocumentById(documentId);
-    if (!document) {
-        throw createNotFoundError('Không tìm thấy văn bản');
+    const transaction = await sequelize.transaction();
+
+    try {
+        const document = await leaderRepository.findDocumentById(documentId);
+        if (!document) {
+            throw createNotFoundError('Không tìm thấy văn bản');
+        }
+
+        const department = await leaderRepository.findDepartmentByManagerId(managerId);
+        if (!department) {
+            throw createNotFoundError('Không tìm thấy phòng ban của trưởng phòng');
+        }
+
+        const existingTask = await taskDepartmentRepository.findTaskDepartmentByDocumentAndManager(documentId, managerId);
+        if (existingTask) {
+            throw createValidationError('Task cho trưởng phòng này đã tồn tại');
+        }
+
+        const created = await taskDepartmentRepository.createTaskDepartment({
+            documentId,
+            managerId,
+            note: directionDescription
+        }, { transaction });
+
+        await documentRepository.updateDocumentById(documentId, {
+            status: DOCUMENT_STATUS.PROCESSING
+        }, { transaction });
+
+        await transaction.commit();
+
+        return {
+            id: created.id,
+            documentId: created.documentId,
+            managerId: created.managerId,
+            note: created.note,
+            directionDescription,
+            department: normalizeDepartment(department)
+        };
+    } catch (error) {
+        if (!transaction.finished) {
+            await transaction.rollback();
+        }
+        throw error;
     }
-
-    const department = await leaderRepository.findDepartmentByManagerId(managerId);
-    if (!department) {
-        throw createNotFoundError('Không tìm thấy phòng ban của trưởng phòng');
-    }
-
-    const existingTask = await taskDepartmentRepository.findTaskDepartmentByDocumentAndManager(documentId, managerId);
-    if (existingTask) {
-        throw createValidationError('Task cho trưởng phòng này đã tồn tại');
-    }
-
-    const created = await taskDepartmentRepository.createTaskDepartment({
-        documentId,
-        managerId,
-        note: directionDescription
-    });
-
-    return {
-        id: created.id,
-        documentId: created.documentId,
-        managerId: created.managerId,
-        note: created.note,
-        directionDescription,
-        department: normalizeDepartment(department)
-    };
 }
 
 async function getDepartments() {

@@ -70,8 +70,7 @@ const DOCUMENT_TYPE = {
 
 // ============ TASK STATUS ============
 const TASK_STATUS = {
-  TODO: 'TODO',                  // ChÆ°a lÃ m
-  DOING: 'DOING',                // Äang lÃ m
+  TODO: 'TODO',                  // ChÆ°a lÃ m              // Äang lÃ m
   WAITING_APPROVAL: 'WAITING_APPROVAL',  // Chá» duyá»‡t
   REJECTED: 'REJECTED',          // Tu choi (manager reject)
   DONE: 'DONE',                  // Xong

@@ -21,7 +21,15 @@ const LEGACY_STATUS_MAP = {
 
 function normalizeStatus(value, fallback = DOCUMENT_STATUS.DRAFT) {
     if (!value) return fallback;
-    const key = String(value || '').trim().toLowerCase();
+    const str = String(value || '').trim();
+
+    // If value already matches one of DOCUMENT_STATUS values (case-insensitive), return that enum value
+    const upper = str.toUpperCase();
+    const matched = Object.values(DOCUMENT_STATUS).find(v => String(v).toUpperCase() === upper);
+    if (matched) return matched;
+
+    // Otherwise try legacy mapping by lowercased keys
+    const key = str.toLowerCase();
     return LEGACY_STATUS_MAP[key] || fallback;
 }
 
@@ -257,7 +265,7 @@ async function createDocument(payload, files = []) {
     }
 }
 
-async function updateDocumentStatus(payload) {
+async function updateDocumentApprove(payload) {
     if (!payload.id || !payload.status) {
         throw createValidationError('id và status là bắt buộc');
     }
@@ -276,10 +284,12 @@ async function updateDocumentStatus(payload) {
         status: nextStatus
     });
 
+    console.log(`Document ${payload.id} status updated to ${nextStatus}`);
+
     // Create flow history record
     await documentRepository.createFlowHistory({
         documentId: payload.id,
-        action: 'STATUS_UPDATED',
+        action: 'APPROVE',
         status: nextStatus,
         note: payload.note || null,
         processedAt: new Date(),
@@ -419,7 +429,7 @@ module.exports = {
     getAllDocuments,
     getDocumentById,
     createDocument,
-    updateDocumentStatus,
+    updateDocumentApprove,
     submitDocumentToLeader,
     deleteDocument,
     getDocumentStats,

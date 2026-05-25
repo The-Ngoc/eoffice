@@ -9,8 +9,14 @@ router.get('/document/all', documentController.getAllDocuments);
 router.get('/document/stats/status', documentController.getDocumentStats);
 router.get('/document/:id', documentController.getDocumentById);
 router.post('/document/add', uploadDocumentFile.array('files'), documentController.addDocument);
-router.put('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentStatus);
-router.post('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentStatus);
+
+router.put('/document/status-approve', validateDocumentStatusTransition, documentController.updateDocumentApprove);
+
+// Backward-compatible endpoints used by older FE builds
+router.post('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentApprove);
+router.put('/document/update-status', validateDocumentStatusTransition, documentController.updateDocumentApprove);
+
+
 router.post('/document/submit-to-leader', documentController.submitToLeader);
 router.post('/document/extract-azure-content', uploadDocumentFile.single('file'), documentController.extractAzureContent);
 router.delete('/document/delete', documentController.deleteDocument);

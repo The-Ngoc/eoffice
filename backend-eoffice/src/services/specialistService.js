@@ -1,7 +1,7 @@
 const specialistRepository = require('../repository/specialistRepository');
-const managerRepository = require('../repository/managerRepository');
+const sequelize = require('../config/db');
 const cloudinaryService = require('./cloudinaryService');
-const { TASK_STATUS } = require('../constants/enums');
+const { TASK_STATUS, ROLES } = require('../constants/enums');
 
 function createError(message, statusCode = 400) {
     const error = new Error(message);
@@ -79,7 +79,8 @@ function mapTaskDetail(task) {
 
 async function getMyTasks(query = {}, requester = {}) {
     const userId = requester.id || query.userId;
-    if (!userId) throw createError('Thiếu userId', 400);
+    // If no userId provided, return empty list (no auth) instead of throwing
+    if (!userId) return [];
 
     const member = await specialistRepository.findMemberByUserId(userId);
     if (!member) return [];
@@ -89,18 +90,19 @@ async function getMyTasks(query = {}, requester = {}) {
 }
 
 async function getTaskDetail(taskId, requester = {}) {
-    const userId = requester.id;
-    if (!userId) throw createError('Thiếu userId', 400);
     if (!taskId) throw createError('Thiếu taskId', 400);
-
-    const member = await specialistRepository.findMemberByUserId(userId);
-    if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
 
     const task = await specialistRepository.findTaskDetail(taskId);
     if (!task) throw createError('Task không tồn tại', 404);
 
-    if (String(task.memberId) !== String(member.id)) {
-        throw createError('Bạn không có quyền xem task này', 403);
+    // If requester provided and is a member, enforce member restriction
+    const userId = requester.id;
+    if (userId) {
+        const member = await specialistRepository.findMemberByUserId(userId);
+        if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
+        if (String(task.memberId) !== String(member.id)) {
+            throw createError('Bạn không có quyền xem task này', 403);
+        }
     }
 
     return mapTaskDetail(task);
@@ -112,22 +114,35 @@ function clampProgress(value) {
     return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
-async function updateProgress(taskId, payload = {}, requester = {}) {
+async function resolveSpecialistRequester(requester = {}) {
+    // If no requester info provided, return nulls and let callers decide
     const userId = requester.id;
-    if (!userId) throw createError('Thiếu userId', 400);
-    if (!taskId) throw createError('Thiếu taskId', 400);
+    if (!userId) return { user: null, member: null };
 
-    const member = await specialistRepository.findMemberByUserId(userId);
-    if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
-
-    const task = await specialistRepository.findTaskDetail(taskId);
-    if (!task) throw createError('Task không tồn tại', 404);
-    if (String(task.memberId) !== String(member.id)) {
-        throw createError('Bạn không có quyền cập nhật task này', 403);
+    const requesterRole = String(requester.role || '').trim().toUpperCase();
+    if (requesterRole && requesterRole !== ROLES.SPECIALIST) {
+        throw createError('Không có quyền truy cập', 403);
     }
 
+    const user = await specialistRepository.findUserById(userId);
+    if (!user) {
+        throw createError('Không tìm thấy người dùng', 401);
+    }
+
+    if (String(user.role || '').trim().toUpperCase() !== ROLES.SPECIALIST) {
+        throw createError('Không có quyền truy cập', 403);
+    }
+
+    const member = await specialistRepository.findMemberByUserId(userId);
+    if (!member) {
+        throw createError('User chưa thuộc phòng ban nào', 403);
+    }
+
+    return { user, member };
+}
+
+async function updateProgress(taskId, payload = {}, requester = {}) {
     const progress = clampProgress(payload.progress);
-    const content = payload.content ? String(payload.content).trim() : null;
 
     const nextStatus = progress >= 100 ? TASK_STATUS.DONE : TASK_STATUS.DOING;
 
@@ -136,28 +151,23 @@ async function updateProgress(taskId, payload = {}, requester = {}) {
         status: nextStatus
     });
 
-    await specialistRepository.createTaskHistory({
-        taskId,
-        userId,
-        type: 'PROGRESS',
-        progress,
-        content
-    });
+    if (!updated) {
+        throw createError('Không thể cập nhật progress cho task', 500);
+    }
 
     return mapTask(updated);
 }
 
 async function addComment(taskId, payload = {}, requester = {}) {
-    const userId = requester.id;
-    if (!userId) throw createError('Thiếu userId', 400);
-    if (!taskId) throw createError('Thiếu taskId', 400);
+    const { user, member } = await resolveSpecialistRequester(requester);
 
-    const member = await specialistRepository.findMemberByUserId(userId);
-    if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
+    if (!taskId) throw createError('Thiếu taskId', 400);
 
     const task = await specialistRepository.findTaskDetail(taskId);
     if (!task) throw createError('Task không tồn tại', 404);
-    if (String(task.memberId) !== String(member.id)) {
+
+    // If requester provided and is a member, enforce membership
+    if (member && String(task.memberId) !== String(member.id)) {
         throw createError('Bạn không có quyền cập nhật task này', 403);
     }
 
@@ -166,7 +176,7 @@ async function addComment(taskId, payload = {}, requester = {}) {
 
     const history = await specialistRepository.createTaskHistory({
         taskId,
-        userId,
+        userId: user ? user.id : null,
         type: 'COMMENT',
         content
     });
@@ -175,90 +185,101 @@ async function addComment(taskId, payload = {}, requester = {}) {
 }
 
 async function submitTask(taskId, payload = {}, files = [], requester = {}, options = {}) {
-    const userId = requester.id;
-    if (!userId) throw createError('Thiếu userId', 400);
-    if (!taskId) throw createError('Thiếu taskId', 400);
+    const { user, member } = await resolveSpecialistRequester(requester);
 
-    const member = await specialistRepository.findMemberByUserId(userId);
-    if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
+    if (!taskId) throw createError('Thiếu taskId', 400);
 
     const task = await specialistRepository.findTaskDetail(taskId);
     if (!task) throw createError('Task không tồn tại', 404);
-    if (String(task.memberId) !== String(member.id)) {
-        throw createError('Bạn không có quyền nộp task này', 403);
-    }
 
-    const submissionNotes = payload.submissionNotes ? String(payload.submissionNotes) : null;
+    const submissionNotes = payload.submissionNotes ? String(payload.submissionNotes).trim() : null;
     const isResubmission = Boolean(options.resubmit);
 
-    if (isResubmission && task.status !== TASK_STATUS.REJECTED) {
-        throw createError('Chỉ có thể gửi lại khi task đang ở trạng thái REJECTED', 400);
-    }
-
     if (isResubmission) {
-        await specialistRepository.deleteTaskFiles(taskId);
-    }
-
-    const uploaded = [];
-    if (Array.isArray(files) && files.length) {
-        for (const file of files) {
-            const uploadedResult = await cloudinaryService.uploadBufferToCloudinary(
-                file.buffer,
-                file.originalname,
-                { contentType: file.mimetype }
-            );
-
-            uploaded.push({
-                nameFile: file.originalname,
-                url: uploadedResult.secureUrl || uploadedResult.url
-            });
+        if (task.status !== TASK_STATUS.REJECTED) {
+            throw createError('Chỉ có thể gửi lại khi task đang ở trạng thái REJECTED', 409);
         }
     }
 
-    if (uploaded.length) {
-        await specialistRepository.addTaskFiles(uploaded.map((item) => ({
-            taskId,
-            nameFile: item.nameFile,
-            url: item.url
-        })));
+    const uploadedAssets = [];
+    const transaction = await sequelize.transaction();
+
+    try {
+        if (isResubmission) {
+            await specialistRepository.deleteTaskFiles(taskId, { transaction });
+        }
+
+        const taskFiles = [];
+        if (Array.isArray(files) && files.length > 0) {
+            for (const [index, file] of files.entries()) {
+                const fileName = `task_${taskId}_${Date.now()}_${index}_${file.originalname}`;
+                const result = await cloudinaryService.uploadBufferToCloudinary(file.buffer, fileName, {
+                    contentType: file.mimetype,
+                    folder: 'tasks'
+                });
+
+                if (!result.success || (!result.secureUrl && !result.url)) {
+                    throw createError(`Upload file "${file.originalname}" thất bại`, 500);
+                }
+
+                uploadedAssets.push({
+                    publicId: result.publicId,
+                    resourceType: result.resourceType
+                });
+
+                taskFiles.push({
+                    taskId,
+                    nameFile: file.originalname,
+                    url: result.secureUrl || result.url
+                });
+            }
+
+            await specialistRepository.addTaskFiles(taskFiles, { transaction });
+        }
+
+        await specialistRepository.updateTaskById(taskId, {
+            progress: 100,
+            status: TASK_STATUS.WAITING_APPROVAL,
+            rejectionReason: null
+        }, { transaction });
+
+        await transaction.commit();
+
+        const updatedTask = await specialistRepository.findTaskDetail(taskId);
+        return mapTaskDetail(updatedTask);
+    } catch (error) {
+        if (!transaction.finished) {
+            await transaction.rollback();
+        }
+
+        for (const asset of uploadedAssets) {
+            if (asset.publicId) {
+                try {
+                    await cloudinaryService.deleteAssetFromCloudinary(asset.publicId, asset.resourceType || 'raw');
+                } catch (cleanupError) {
+                    console.error('Failed to cleanup uploaded specialist task file', cleanupError);
+                }
+            }
+        }
+
+        throw error;
     }
-
-    const updated = await specialistRepository.updateTaskById(taskId, {
-        progress: 100,
-        status: TASK_STATUS.WAITING_APPROVAL,
-        rejectionReason: null
-    });
-
-    await specialistRepository.createTaskHistory({
-        taskId,
-        userId,
-        type: isResubmission ? 'RESUBMISSION' : 'SUBMISSION',
-        progress: 100,
-        content: submissionNotes
-    });
-
-    const mapped = mapTask(updated);
-
-    // Placeholder “notify” payload (no realtime system wired yet)
-    const assigner = await managerRepository.findUserById(task.assignerId);
-    return {
-        task: mapped,
-        notify: assigner ? { toUserId: assigner.id, reason: 'TASK_SUBMITTED', taskId } : null
-    };
 }
 
 async function deleteTaskFile(taskId, fileId, requester = {}) {
-    const userId = requester.id;
-    if (!userId) throw createError('Thiếu userId', 400);
     if (!taskId || !fileId) throw createError('Thiếu taskId/fileId', 400);
 
-    const member = await specialistRepository.findMemberByUserId(userId);
-    if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
+    // If requester provided, enforce membership
+    const userId = requester.id;
+    if (userId) {
+        const member = await specialistRepository.findMemberByUserId(userId);
+        if (!member) throw createError('User chưa thuộc phòng ban nào', 403);
 
-    const task = await specialistRepository.findTaskDetail(taskId);
-    if (!task) throw createError('Task không tồn tại', 404);
-    if (String(task.memberId) !== String(member.id)) {
-        throw createError('Bạn không có quyền chỉnh file của task này', 403);
+        const task = await specialistRepository.findTaskDetail(taskId);
+        if (!task) throw createError('Task không tồn tại', 404);
+        if (String(task.memberId) !== String(member.id)) {
+            throw createError('Bạn không có quyền chỉnh file của task này', 403);
+        }
     }
 
     await specialistRepository.deleteTaskFileById(taskId, fileId);

@@ -52,9 +52,9 @@ exports.addDocument = async (req, res) => {
     }
 };
 
-exports.updateDocumentStatus = async (req, res) => {
+exports.updateDocumentApprove = async (req, res) => {
     try {
-        const document = await documentService.updateDocumentStatus(req.body);
+        const document = await documentService.updateDocumentApprove(req.body);
         return sendSuccess(res, document, 'Cập nhật trạng thái văn bản thành công');
     } catch (error) {
         console.error('❌ Lỗi khi cập nhật trạng thái văn bản:', error);

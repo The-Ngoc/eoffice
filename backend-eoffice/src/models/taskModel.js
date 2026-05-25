@@ -48,7 +48,7 @@ const Task = sequelize.define('Task', {
         defaultValue: PRIORITY.MEDIUM
     },
     dueDate: {
-        type: DataTypes.DATEONLY,
+        type: DataTypes.DATE,
         allowNull: true,
         field: 'due_date'
     },
@@ -91,11 +91,6 @@ Task.associate = (models) => {
     Task.hasMany(models.TaskFile, {
         foreignKey: 'taskId',
         as: 'files'
-    });
-
-    Task.hasMany(models.TaskHistory, {
-        foreignKey: 'taskId',
-        as: 'history'
     });
 };
 

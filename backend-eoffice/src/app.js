@@ -9,6 +9,8 @@ const workflowRoutes = require('./routes/workflowRoutes');
 const managerRoutes = require('./routes/managerRoutes');
 const specialistRoutes = require('./routes/specialistRoutes');
 const cloudinaryRoutes = require('./routes/cloudinaryRoutes');
+const departmentMemberRoutes = require('./routes/departmentMemberRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 
 const app = express();
@@ -40,6 +42,9 @@ app.use('/api', workflowRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/specialist', specialistRoutes);
 app.use('/api/cloudinary', cloudinaryRoutes);
+
+app.use('/api', departmentMemberRoutes);
+app.use('/api', taskRoutes);
 
 
 

@@ -58,7 +58,7 @@ async function addComment(req, res) {
 async function submitTask(req, res) {
     try {
         const data = await specialistService.submitTask(req.params.taskId, req.body, req.files || [], getRequester(req));
-        return sendSuccess(res, data, 'Nộp task thành công', 201);
+        return sendSuccess(res, data, 'Nộp task thành công');
     } catch (error) {
         return sendError(res, error);
     }
@@ -67,7 +67,7 @@ async function submitTask(req, res) {
 async function resubmitTask(req, res) {
     try {
         const data = await specialistService.submitTask(req.params.taskId, req.body, req.files || [], getRequester(req), { resubmit: true });
-        return sendSuccess(res, data, 'Gửi lại task thành công', 201);
+        return sendSuccess(res, data, 'Gửi lại task thành công');
     } catch (error) {
         return sendError(res, error);
     }
