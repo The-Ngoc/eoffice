@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Role } from '../types';
+import { Role } from '../models/User.ts';
 
 // Các kiểu dữ liệu
 export interface UserRecord {

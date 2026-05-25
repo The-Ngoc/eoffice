@@ -1,5 +1,5 @@
 
-import { User, DocumentTask, Role } from './types';
+import { Role, User } from './models/User.ts';
 
 export const TEAMS_PURPLE = '#6264A7';
 export const TEAMS_BG = '#F5F5F5';

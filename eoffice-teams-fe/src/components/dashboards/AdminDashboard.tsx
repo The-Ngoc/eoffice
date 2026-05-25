@@ -17,7 +17,7 @@ import {
   Bot,
   GitBranch
 } from 'lucide-react';
-import { User, Role } from '../../models/user';
+import { User, Role } from '../../models/User.ts';
 import {
   addUser as addUserApi,
   deleteUserById,

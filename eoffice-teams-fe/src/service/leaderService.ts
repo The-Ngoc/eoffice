@@ -1,6 +1,8 @@
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { Department, DocumentTask, KPIStats, LeaderDeptPerformance } from '../types';
+import { Department } from '../models/Department';
+import { DocumentTask } from '../models/Document';
+import { KPIStats, LeaderDeptPerformance } from '../models/Stats';
 
 interface ApiResponse<T> {
   success: boolean;

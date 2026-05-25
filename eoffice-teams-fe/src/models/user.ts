@@ -3,15 +3,8 @@ export type Role = 'ADMIN' | 'LEADER' | 'SPECIALIST' | 'CLERICAL' | 'MANAGER';
 
 // Định nghĩa cấu trúc User khớp với MySQL của Ngọc
 export interface User {
-  id: string;          // Cái chuỗi ID dài từ Microsoft
+  id: string;          
   fullName: string;
   role: Role;
-  email?: string;     // Thêm trường email nếu cần
+  email?: string;     
 }
-
-// // Định nghĩa cấu trúc phản hồi từ API Backend
-// export interface ApiResponse<T> {
-//   success: boolean;
-//   data: T;
-//   message?: string;
-// }

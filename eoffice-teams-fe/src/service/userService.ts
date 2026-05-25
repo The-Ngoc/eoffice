@@ -1,6 +1,6 @@
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { Role, User } from '../models/user';
+import { Role, User } from '../models/User.ts';
 
 interface ApiResponse<T> {
   success: boolean;

@@ -1,6 +1,8 @@
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { TaskModel, Meeting, ChatMessage } from '../types';
+import { TaskModel } from '../models/Task';
+import { Document as DocumentModel } from '../models/Document';
+import { Meeting, ChatMessage } from '../models/Communication';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -23,6 +25,21 @@ interface BackendTaskDto {
   rejectionReason?: string | null;
   assigner?: { fullName?: string | null } | null;
   files?: Array<{ id: string; nameFile: string; url: string; createdAt?: string }>;
+  document?: {
+    id: string;
+    documentNumber?: string | null;
+    symbol?: string | null;
+    title?: string | null;
+    sender?: string | null;
+    type?: string | null;
+    dueDate?: string | null;
+    status?: string | null;
+    priority?: string | null;
+    createdAt?: string | null;
+    summary?: string | null;
+    legalWarning?: boolean | null;
+    files?: Array<{ id: string | number; file_name: string; file_url: string }>;
+  } | null;
   history?: Array<{ id: string; type: string; progress?: number | null; content?: string | null; createdAt: string; user?: { id: string; fullName: string } | null }>;
 }
 
@@ -56,7 +73,27 @@ const mapBackendTask = (task: BackendTaskDto): TaskModel => ({
   progress: typeof task.progress === 'number' ? task.progress : undefined,
   rejectionReason: task.rejectionReason ?? null,
   files: task.files ?? [],
-  history: task.history ?? [],
+  document: task.document
+    ? {
+        id: task.document.id,
+        documentNumber: task.document.documentNumber ?? undefined,
+        symbol: task.document.symbol ?? undefined,
+        title: task.document.title ?? undefined,
+        sender: task.document.sender ?? undefined,
+        type: task.document.type ?? undefined,
+        dueDate: task.document.dueDate ?? undefined,
+        status: (task.document.status as DocumentModel['status']) ?? undefined,
+        priority: (task.document.priority as DocumentModel['priority']) ?? undefined,
+        createdAt: task.document.createdAt ?? undefined,
+        summary: task.document.summary ?? undefined,
+        legalWarning: task.document.legalWarning ?? undefined,
+        files: task.document.files?.map((file) => ({
+          id: String(file.id),
+          file_name: file.file_name,
+          file_url: file.file_url,
+        })),
+      }
+    : undefined,
 });
 
 const MOCK_MEETINGS: Meeting[] = [
@@ -99,45 +136,94 @@ export const specialistService = {
   },
 
   getTaskDetail: async (taskId: string): Promise<TaskModel> => {
-    const response = await axiosClient.get(ENDPOINTS.SPECIALIST.TASK_DETAIL(taskId));
+    const response = await axiosClient.get(
+      ENDPOINTS.SPECIALIST.TASK_DETAIL.replace(':taskId', encodeURIComponent(taskId)),
+    );
     const payload = response.data as ApiResponse<BackendTaskDto>;
     return mapBackendTask(payload.data);
   },
 
   updateTaskProgressWithLog: async (taskId: string, progress: number, content?: string): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress, content });
+    const response = await axiosClient.post(
+      ENDPOINTS.SPECIALIST.UPDATE_PROGRESS.replace(':taskId', encodeURIComponent(taskId)),
+      { progress, content },
+    );
+    console.log('📈 Progress update response:', { taskId, progress, content, responseData: response.data });
     const payload = response.data as ApiResponse<unknown>;
     return payload.success;
   },
 
   addDailyLog: async (taskId: string, content: string): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.ADD_COMMENT(taskId), { content });
+    const response = await axiosClient.post(
+      ENDPOINTS.SPECIALIST.ADD_COMMENT.replace(':taskId', encodeURIComponent(taskId)),
+      { content },
+    );
     const payload = response.data as ApiResponse<unknown>;
     return payload.success;
   },
 
   submitTask: async (taskId: string, submissionNotes: string, files: File[]): Promise<boolean> => {
+    const url = ENDPOINTS.SPECIALIST.SUBMIT.replace(':taskId', encodeURIComponent(taskId));
     const form = new FormData();
     form.append('submissionNotes', submissionNotes);
     files.forEach((file) => form.append('files', file));
 
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.SUBMIT(taskId), form);
-    const payload = response.data as ApiResponse<unknown>;
-    return payload.success;
+    try {
+      const response = await axiosClient.post(url, form);
+      const payload = response.data as ApiResponse<unknown>;
+      console.log('submitTask response', { url, payload });
+      return payload.success;
+    } catch (err: any) {
+      console.error('submitTask failed', { url, taskId, submissionNotesLength: submissionNotes?.length, filesCount: files.length, error: err?.response?.data || err?.message || err });
+
+      try {
+        const altForm = new FormData();
+        altForm.append('notes', submissionNotes);
+        files.forEach((file) => altForm.append('files', file));
+        const altResponse = await axiosClient.post(url, altForm);
+        const altPayload = altResponse.data as ApiResponse<unknown>;
+
+        return altPayload.success;
+      } catch (altErr: any) {
+        console.error('submitTask fallback failed', { url, taskId, error: altErr?.response?.data || altErr?.message || altErr });
+        return false;
+      }
+    }
   },
 
   resubmitTask: async (taskId: string, submissionNotes: string, files: File[]): Promise<boolean> => {
+    const url = ENDPOINTS.SPECIALIST.RESUBMIT.replace(':taskId', encodeURIComponent(taskId));
     const form = new FormData();
     form.append('submissionNotes', submissionNotes);
     files.forEach((file) => form.append('files', file));
 
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.RESUBMIT(taskId), form);
-    const payload = response.data as ApiResponse<unknown>;
-    return payload.success;
+    try {
+      const response = await axiosClient.post(url, form);
+      const payload = response.data as ApiResponse<unknown>;
+      return payload.success;
+    } catch (err: any) {
+      console.error('resubmitTask failed', { url, taskId, submissionNotesLength: submissionNotes?.length, filesCount: files.length, error: err?.response?.data || err?.message || err });
+  
+      try {
+        const altForm = new FormData();
+        altForm.append('notes', submissionNotes);
+        files.forEach((file) => altForm.append('files', file));
+        const altResponse = await axiosClient.post(url, altForm);
+        const altPayload = altResponse.data as ApiResponse<unknown>;
+        return altPayload.success;
+      } catch (altErr: any) {
+        console.error('resubmitTask fallback failed', { url, taskId, error: altErr?.response?.data || altErr?.message || altErr });
+        return false;
+      }
+    }
   },
 
   deleteTaskFile: async (taskId: string, fileId: string): Promise<boolean> => {
-    const response = await axiosClient.delete(ENDPOINTS.SPECIALIST.DELETE_FILE(taskId, fileId));
+    const response = await axiosClient.delete(
+      ENDPOINTS.SPECIALIST.DELETE_FILE
+        .replace(':taskId', encodeURIComponent(taskId))
+        .replace(':fileId', encodeURIComponent(fileId)),
+    );
     const payload = response.data as ApiResponse<unknown>;
     return payload.success;
   },
@@ -169,13 +255,19 @@ export const specialistService = {
   },
 
   acceptTask: async (taskId: string): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress: 1 });
+    const response = await axiosClient.post(
+      ENDPOINTS.SPECIALIST.UPDATE_PROGRESS.replace(':taskId', encodeURIComponent(taskId)),
+      { progress: 1 },
+    );
     const payload = response.data as ApiResponse<unknown>;
     return payload.success;
   },
 
   completeTask: async (taskId: string): Promise<boolean> => {
-    const response = await axiosClient.post(ENDPOINTS.SPECIALIST.UPDATE_PROGRESS(taskId), { progress: 100 });
+    const response = await axiosClient.post(
+      ENDPOINTS.SPECIALIST.UPDATE_PROGRESS.replace(':taskId', encodeURIComponent(taskId)),
+      { progress: 100 },
+    );
     const payload = response.data as ApiResponse<unknown>;
     return payload.success;
   },

@@ -23,7 +23,9 @@ import {
   Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, TaskModel, Meeting, ChatMessage } from '../../types';
+import { User } from '../../models/User.ts';
+import { TaskModel } from '../../models/Task';
+import { Meeting, ChatMessage } from '../../models/Communication';
 import { StatCard, ToolCard, InteractiveProgressBar } from '../common/SharedComponents';
 import { specialistService } from '../../service/specialService';
 
@@ -299,7 +301,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                           <div className="mt-3 flex items-center justify-between text-[10px] text-text-secondary">
                              <div className="flex items-center gap-1 font-medium">
                                <Plus size={12} />
-                               <span>Sếp {task.sender}</span>
+                               <span>Sếp {task.assigner?.fullName || task.sender}</span>
                              </div>
                              <div className="flex items-center gap-1 font-bold italic">
                                <Calendar size={12} />
@@ -407,7 +409,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                         <div>
                           <h2 className="text-sm font-black text-text-main line-clamp-1">{selectedTask.title}</h2>
                           <div className="flex items-center gap-2 mt-0.5">
-                             <span className="text-[9px] font-bold text-teams-purple uppercase tracking-tighter">Gửi bởi: {selectedTask.sender}</span>
+                             <span className="text-[9px] font-bold text-teams-purple uppercase tracking-tighter">Gửi bởi: {selectedTask.assigner?.fullName || selectedTask.sender}</span>
                              <span className="text-[9px] text-gray-300">|</span>
                              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Hạn: {selectedTask.deadline}</span>
                              <span className="text-[9px] text-gray-300">|</span>
@@ -424,18 +426,6 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {selectedTask.status === 'Todo' && (
-                          <button 
-                            onClick={handleAcceptTask}
-                            className="bg-teams-purple text-white px-4 py-2 rounded-lg text-xs font-black shadow-md shadow-teams-purple/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                          >Xác nhận nhận việc</button>
-                        )}
-                        {selectedTask.status === 'Doing' && (
-                          <button 
-                            onClick={() => setShowSubmission(true)}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md shadow-green-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                          >Submit Task</button>
-                        )}
                         {selectedTask.status === 'UnderReview' && (
                           <button
                             disabled
@@ -475,7 +465,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
                                   <div className="text-[9px] font-black text-gray-400 uppercase">Người giao</div>
-                                  <div className="text-xs font-bold text-text-main mt-1">{selectedTask.sender || 'N/A'}</div>
+                                    <div className="text-xs font-bold text-text-main mt-1">{selectedTask.assigner?.fullName || selectedTask.sender || 'N/A'}</div>
                                 </div>
                                 <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
                                   <div className="text-[9px] font-black text-gray-400 uppercase">Độ ưu tiên</div>
@@ -491,6 +481,61 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                               </div>
                             </section>
+
+                            {selectedTask.document && (
+                              <section className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Thông tin văn bản</h3>
+                                  <span className="text-[10px] font-black text-teams-purple">Document</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3">
+                                  <div className="p-3 bg-white border border-teams-border rounded-xl">
+                                    <div className="text-[9px] font-black text-gray-400 uppercase">Tiêu đề</div>
+                                    <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.title || 'N/A'}</div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                      <div className="text-[9px] font-black text-gray-400 uppercase">Số văn bản</div>
+                                      <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.documentNumber || 'N/A'}</div>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                      <div className="text-[9px] font-black text-gray-400 uppercase">Ký hiệu</div>
+                                      <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.symbol || 'N/A'}</div>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                      <div className="text-[9px] font-black text-gray-400 uppercase">Nguồn gửi</div>
+                                      <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.sender || 'N/A'}</div>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                      <div className="text-[9px] font-black text-gray-400 uppercase">Loại văn bản</div>
+                                      <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.type || 'N/A'}</div>
+                                    </div>
+                                  </div>
+
+                                  <div className="p-3 bg-white border border-teams-border rounded-xl space-y-2">
+                                    <div className="text-[9px] font-black text-gray-400 uppercase">Tệp đính kèm văn bản</div>
+                                    {(selectedTask.document.files || []).length > 0 ? (
+                                      <div className="space-y-2">
+                                        {selectedTask.document.files!.map((file) => (
+                                          <a
+                                            key={file.id}
+                                            href={file.file_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:border-teams-purple/30 transition-all"
+                                          >
+                                            <span className="text-xs font-bold text-text-main truncate">{file.file_name}</span>
+                                            <span className="text-[10px] font-black text-teams-purple">Mở</span>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-gray-400 italic">Chưa có file đính kèm.</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </section>
+                            )}
 
                             <section className="space-y-3">
                               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mô tả chi tiết</h3>
@@ -518,44 +563,32 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                   >{v}%</button>
                                 ))}
                               </div>
-                              <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Báo cáo nhanh</label>
-                                <textarea
-                                  value={dailyLog}
-                                  onChange={(e) => setDailyLog(e.target.value)}
-                                  placeholder="Ví dụ: Đã thiết kế xong DB, đang viết Service"
-                                  className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-teams-purple rounded-2xl outline-none text-sm font-medium resize-none transition-all"
-                                  rows={3}
-                                />
-                                <button
-                                  onClick={handleUpdateProgress}
-                                  disabled={isUpdatingProgress || !selectedTask}
-                                  className="w-full py-3 bg-teams-purple text-white rounded-xl text-[11px] font-black uppercase shadow-lg shadow-teams-purple/20 hover:scale-[1.01] transition-all active:scale-95 disabled:opacity-50"
-                                >{isUpdatingProgress ? 'Đang cập nhật...' : 'Cập nhật'}</button>
-                              </div>
+                              {progress < 100 && (
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Báo cáo nhanh</label>
+                                  <textarea
+                                    value={dailyLog}
+                                    onChange={(e) => setDailyLog(e.target.value)}
+                                    placeholder="Ví dụ: Đã thiết kế xong DB, đang viết Service"
+                                    className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-teams-purple rounded-2xl outline-none text-sm font-medium resize-none transition-all"
+                                    rows={3}
+                                  />
+                                  <button
+                                    onClick={handleUpdateProgress}
+                                    disabled={isUpdatingProgress || !selectedTask}
+                                    className="w-full py-3 bg-teams-purple text-white rounded-xl text-[11px] font-black uppercase shadow-lg shadow-teams-purple/20 hover:scale-[1.01] transition-all active:scale-95 disabled:opacity-50"
+                                  >{isUpdatingProgress ? 'Đang cập nhật...' : 'Cập nhật'}</button>
+                                </div>
+                              )}
+
+                              {progress >= 100 && (
+                                <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800 font-medium">
+                                  Tiến độ đã đạt 100%. Phần báo cáo nhanh và cập nhật được ẩn để chuyển sang bước nộp bài.
+                                </div>
+                              )}
                             </section>
 
-                            <section className="space-y-3">
-                              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Activity log</h3>
-                              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                                {(selectedTask.history || []).length === 0 ? (
-                                  <div className="text-xs text-gray-400 italic">Chưa có log.</div>
-                                ) : (
-                                  (selectedTask.history || []).map((h) => (
-                                    <div key={h.id} className="p-3 bg-white border border-gray-100 rounded-xl">
-                                      <div className="flex items-center justify-between">
-                                        <div className="text-[10px] font-black text-text-main">{h.user?.fullName || 'Bạn'} • {h.type}</div>
-                                        <div className="text-[10px] font-bold text-gray-400">{new Date(h.createdAt).toLocaleString()}</div>
-                                      </div>
-                                      {(h.progress !== null && h.progress !== undefined) && (
-                                        <div className="text-[10px] font-bold text-teams-purple mt-1">Progress: {h.progress}%</div>
-                                      )}
-                                      {h.content && <div className="text-xs text-text-main mt-2 whitespace-pre-wrap">{h.content}</div>}
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </section>
+                            {/* Activity log removed for Task to avoid relying on backend history schema */}
 
                             {(showSubmission || progress >= 100 || selectedTask.status === 'Rejected') && (
                               <section className="space-y-3">

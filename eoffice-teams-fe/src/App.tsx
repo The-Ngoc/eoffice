@@ -9,7 +9,7 @@ import { AdminProvider } from './context/adminContext';
 import { MainLayout } from './layout/MainLayout';
 import { DashboardRouter } from './routes/DashboardRoutes';
 import { getAllUsers, getMyProfile } from './service/userService';
-import { Role, User } from './models/user';
+import { Role, User } from './models/User.ts';
 
 // Support for Teams SDK
 declare global {

@@ -1,73 +1,24 @@
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { TaskModel } from '../types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-}
-
-interface ManagerTaskDocumentDto {
-  id: string | number;
-  documentNumber?: string;
-  symbol?: string;
-  title?: string;
-  sender?: string;
-  status?: string;
-  urgency?: string;
-  priority?: string | null;
-  description?: string | null;
-  summary?: string;
-  legalWarning?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  files?: Array<{
-    id: string | number;
-    nameFile?: string;
-    url?: string;
-  }>;
-}
-
-interface ManagerTaskDepartmentDto {
-  id: string | number;
-  code?: string;
-  name?: string;
-  managerId?: string | number;
-  managerName?: string;
-}
-
-interface ManagerTaskDto {
-  id: string | number;
-  parentId?: string | number;
-  title?: string;
-  description?: string;
-  sender?: string;
-  status?: string;
-  priority?: string;
-  deadline?: string;
-  createdAt?: string;
-  assigneeId?: string | number;
-  aiSummary?: string;
-  attachments?: string[];
-}
-
-interface ManagerDepartmentTaskDto {
-  id: string | number;
-  note?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  department?: ManagerTaskDepartmentDto;
-  document?: ManagerTaskDocumentDto;
-}
+import { TaskModel ,TaskLeader } from '../models/Task';
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  ManagerTaskCreatePayload,
+  ManagerTaskUpdatePayload,
+  ManagerClericalReminderRequest,
+  ManagerClericalReminderResponse,
+} from '../models/Manager';
 
 const normalizeStatus = (status?: string): TaskModel['status'] => {
   const normalized = (status ?? '').toUpperCase();
-  if (normalized === 'DOING' || normalized === 'APPROVED' || normalized === 'PROCESSING' || normalized === 'WAITING_PUBLISH') return 'Doing';
-  if (normalized === 'WAITING_APPROVAL') return 'UnderReview';
+
+  if (normalized === 'DOING' || normalized === 'APPROVED' || normalized === 'PROCESSING' || normalized === 'WAITING_PUBLISH' || normalized === 'IN_PROGRESS') return 'Doing';
+  if (normalized === 'WAITING_APPROVAL' || normalized === 'UNDER_REVIEW') return 'UnderReview';
   if (normalized === 'REJECTED') return 'Rejected';
   if (normalized === 'DONE' || normalized === 'COMPLETED') return 'Completed';
   if (normalized === 'OVERDUE') return 'Overdue';
+
   return 'Todo';
 };
 
@@ -75,91 +26,177 @@ const normalizePriority = (priority?: string, urgency?: string): TaskModel['prio
   const normalizedPriority = (priority ?? '').toUpperCase();
   const normalizedUrgency = (urgency ?? '').toUpperCase();
 
-  if (normalizedPriority === 'CRITICAL' || normalizedUrgency === 'HỎA TỐC' || normalizedUrgency === 'HOA TOC') return 'Critical';
+  if (normalizedPriority === 'URGENT' || normalizedPriority === 'CRITICAL' || normalizedUrgency === 'HỎA TỐC' || normalizedUrgency === 'HOA TOC') return 'Critical';
   if (normalizedPriority === 'HIGH' || normalizedUrgency === 'KHẨN' || normalizedUrgency === 'KHAN') return 'High';
   if (normalizedPriority === 'MEDIUM') return 'Medium';
 
   return 'Low';
 };
 
-const mapDepartmentTaskDto = (item: ManagerDepartmentTaskDto): TaskModel => {
-  const document = item.document;
-  const attachments = document?.files?.map((file) => file.nameFile ?? String(file.id)).filter(Boolean) ?? [];
-  const fallbackDate = document?.updatedAt || document?.createdAt || item.updatedAt || item.createdAt || '';
+const normalizeResponseList = <T>(responseData: ApiResponse<T[] | PaginatedResponse<T>>): T[] => {
+  if (Array.isArray(responseData.data)) {
+    return responseData.data;
+  }
 
-  return {
-    id: String(item.id),
-    title: document?.title ?? 'Chưa có tiêu đề',
-    description: document?.description ?? document?.summary ?? undefined,
-    sender: document?.sender ?? 'N/A',
-    status: normalizeStatus(document?.status),
-    priority: normalizePriority(document?.priority ?? undefined, document?.urgency),
-    deadline: fallbackDate,
-    createdAt: item.createdAt ?? document?.createdAt,
-    aiSummary: document?.summary,
-    attachments,
-    departmentName: item.department?.name ?? '',
-    documentNumber: document?.documentNumber,
-    documentStatus: document?.status,
-    note: item.note,
-  };
+  return responseData.data?.rows ?? [];
 };
 
-const mapTaskDto = (task: ManagerDepartmentTaskDto): TaskModel => mapDepartmentTaskDto(task);
+const buildTaskListUrl = (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  priority?: string;
+  memberId?: string;
+  documentId?: string;
+}) => {
+  const searchParams = new URLSearchParams();
+
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.priority) searchParams.set('priority', params.priority);
+  if (params?.memberId) searchParams.set('memberId', params.memberId);
+  if (params?.documentId) searchParams.set('documentId', params.documentId);
+
+  const query = searchParams.toString();
+  return query ? `${ENDPOINTS.MANAGER.TASKS}?${query}` : ENDPOINTS.MANAGER.TASKS;
+};
+
+// mapTaskDepartmentDto intentionally removed.
 
 export const managerService = {
-  // Lấy danh sách task của manager hiện tại.
-  getMyTasks: async (managerId?: string): Promise<TaskModel[]> => {
+  getMyTasks: async (managerId?: string): Promise<TaskLeader[]> => {
     const url = managerId
-      ? `${ENDPOINTS.MANAGER.MY_TASKS}?userId=${encodeURIComponent(managerId)}`
-      : ENDPOINTS.MANAGER.MY_TASKS;
+      ? `${ENDPOINTS.MANAGER.DEPARTMENT_TASKS}?userId=${encodeURIComponent(managerId)}`
+      : ENDPOINTS.MANAGER.DEPARTMENT_TASKS;
 
     const response = await axiosClient.get(url);
-    const payload = response.data as ApiResponse<ManagerDepartmentTaskDto[]>;
-    return (payload.data ?? []).map(mapTaskDto);
+    const payload = response.data as ApiResponse<TaskLeader[] | PaginatedResponse<TaskLeader>>;
+    const items = normalizeResponseList<TaskLeader>(payload);
+    return items;
   },
 
-  // Alias cũ để tránh vỡ các chỗ gọi khác trong app.
-  getAssignedTasksByDepartment: async (managerId: string): Promise<TaskModel[]> => {
-    return managerService.getMyTasks(managerId);
+  getAssignedTasks: async (managerId: string): Promise<TaskModel[]> => {
+    const response = await axiosClient.get(buildTaskListUrl({ limit: 1000 }));
+    const payload = response.data as ApiResponse<TaskModel[] | PaginatedResponse<TaskModel>>;
+    const rows = normalizeResponseList<TaskModel>(payload);
+
+    return rows.filter((task) => String(task.assignerId ?? task.assigner?.id ?? '') === String(managerId));
   },
 
-  // Lấy danh sách task phụ của phòng.
-  getSubTasks: async (departmentId?: string): Promise<TaskModel[]> => {
-    const url = departmentId
-      ? `${ENDPOINTS.MANAGER.SUB_TASKS}?departmentId=${encodeURIComponent(departmentId)}`
-      : ENDPOINTS.MANAGER.SUB_TASKS;
+  getTasksByDocumentId: async (documentId: string): Promise<TaskModel[]> => {
+    const response = await axiosClient.get(buildTaskListUrl({ limit: 1000, documentId }));
+    const payload = response.data as ApiResponse<TaskModel[] | PaginatedResponse<TaskModel>>;
+    return normalizeResponseList<TaskModel>(payload);
+  },
+
+  getTaskById: async (taskId: string): Promise<TaskModel | null> => {
+    const response = await axiosClient.get(
+      ENDPOINTS.MANAGER.TASK_DETAIL.replace(':taskId', encodeURIComponent(taskId)),
+    );
+    const payload = response.data as ApiResponse<TaskModel>;
+    return payload.data ?? null;
+  },
+
+
+
+
+  getTasksByMember: async (memberId: string, params?: { page?: number; limit?: number; status?: string }): Promise<PaginatedResponse<TaskModel>> => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.status) searchParams.set('status', params.status);
+
+    const query = searchParams.toString();
+    const url = query
+      ? `${ENDPOINTS.MANAGER.TASKS_BY_MEMBER}/${encodeURIComponent(memberId)}?${query}`
+      : `${ENDPOINTS.MANAGER.TASKS_BY_MEMBER}/${encodeURIComponent(memberId)}`;
 
     const response = await axiosClient.get(url);
-    const payload = response.data as ApiResponse<ManagerTaskDto[]>;
-    return (payload.data ?? []).map((task) => ({
-      id: String(task.id),
-      title: task.title ?? 'Chưa có tiêu đề',
-      description: task.description,
-      sender: task.sender ?? 'N/A',
-      status: normalizeStatus(task.status),
-      priority: normalizePriority(task.priority),
-      deadline: task.deadline ?? '',
-      createdAt: task.createdAt,
-      assigneeId: task.assigneeId ? String(task.assigneeId) : undefined,
-      aiSummary: task.aiSummary,
-      attachments: task.attachments ?? [],
-    }));
+    const payload = response.data as ApiResponse<PaginatedResponse<TaskModel>>;
+
+    const data = payload.data ?? {
+      rows: [],
+      count: 0,
+      totalPages: 0,
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    };
+
+    return {
+      ...data,
+      rows: data.rows ?? [],
+    };
   },
 
-  // Cập nhật trạng thái task.
+  createTask: async (payload: ManagerTaskCreatePayload, files: File[] = []): Promise<TaskModel | null> => {
+    const formData = new FormData();
+
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, String(value));
+      }
+    });
+
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    const response = await axiosClient.post(ENDPOINTS.MANAGER.CREATE_TASK, formData);
+    const data = response.data as ApiResponse<TaskModel>;
+    return data.data ?? null;
+  },
+
+  updateTask: async (taskId: string, payload: ManagerTaskUpdatePayload): Promise<TaskModel | null> => {
+    const response = await axiosClient.patch(`${ENDPOINTS.MANAGER.TASKS}/${encodeURIComponent(taskId)}`, payload);
+    const data = response.data as ApiResponse<TaskModel>;
+    return data.data ?? null;
+  },
+
   updateTaskStatus: async (taskId: string, status: TaskModel['status']): Promise<boolean> => {
     const statusMap = {
       Todo: 'TODO',
-      Doing: 'DOING',
-      UnderReview: 'WAITING_APPROVAL',
+      Doing: 'IN_PROGRESS',
+      UnderReview: 'IN_PROGRESS',
       Rejected: 'REJECTED',
-      Completed: 'DONE',
-      Overdue: 'OVERDUE',
+      Done: 'COMPLETED',
+      Completed: 'COMPLETED',
+      Overdue: 'CANCELLED',
     } as const;
 
-    const response = await axiosClient.post(ENDPOINTS.MANAGER.UPDATE_TASK_STATUS, { taskId, status: statusMap[status] ?? status });
-    const payload = response.data as ApiResponse<null>;
-    return payload.success;
+    const response = await axiosClient.patch(`${ENDPOINTS.MANAGER.TASKS}/${encodeURIComponent(taskId)}`, { status: statusMap[status] ?? 'TODO' });
+    const payload = response.data as ApiResponse<TaskLeader>;
+    return Boolean(payload.success);
+  },
+
+  updateDocumentApproved: async (documentId: string): Promise<boolean> => {
+    const response = await axiosClient.put(ENDPOINTS.DOCUMENTS.UPDATE_STATUS, {
+      id: documentId,
+      status: 'APPROVED',
+    });
+    const payload = response.data as ApiResponse<{ id?: string; message?: string }>;
+    console.log('Document approval response:', payload);
+    return Boolean(payload.success);
+  },
+
+  deleteTask: async (taskId: string): Promise<boolean> => {
+    const response = await axiosClient.delete(`${ENDPOINTS.MANAGER.TASKS}/${encodeURIComponent(taskId)}`);
+    const payload = response.data as ApiResponse<{ message?: string }>;
+    return Boolean(payload.success);
+  },
+
+  sendClericalReminder: async (
+    taskId: string,
+    payload: ManagerClericalReminderRequest,
+  ): Promise<ApiResponse<ManagerClericalReminderResponse>> => {
+    const response = await axiosClient.post(
+      ENDPOINTS.MANAGER.REMIND_CLERICAL.replace(':taskId', encodeURIComponent(taskId)),
+      {
+        ...payload,
+        targetRole: 'CLERICAL',
+      },
+    );
+
+    return response.data as ApiResponse<ManagerClericalReminderResponse>;
   },
 };

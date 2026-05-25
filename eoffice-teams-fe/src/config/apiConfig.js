@@ -12,11 +12,11 @@ export const ENDPOINTS = {
     ALL: '/api/document/all',
     DOCUMENT: '/api/document',
     ADD: '/api/document/add',
-    UPDATE_STATUS: '/api/document/update-status',
+    UPDATE_STATUS: '/api/document/status-approve',
     SUBMIT_TO_LEADER: '/api/document/submit-to-leader',
     DELETE: '/api/document/delete',
     FILES: '/api/document/files',
-    FLOW_HISTORY: '/api/document/flow-history',
+    FLOW_HISTORY: '/api/documents/:documentId/flow-history',
   },
   LEADER: {
     WAITING_LEADER_DOCUMENTS: '/api/leader/documents/waiting-leader',
@@ -30,20 +30,30 @@ export const ENDPOINTS = {
     DEPT_PERFORMANCE: '/api/leader/stats/dept-performance',
   },
   MANAGER: {
-    MY_TASKS: '/api/manager/tasks/my',
+    DEPARTMENT_TASKS: '/api/manager/tasks/my',
+    MEMBERS: '/api/departments/:departmentId/members',
+    TASKS: '/api/tasks',
+    TASK_DETAIL: '/api/tasks/:taskId',
+    CREATE_TASK: '/api/new-task',
+
+
     SUB_TASKS: '/api/manager/tasks/sub',
-    MEMBERS: '/api/manager/members',
-    ASSIGN_TASK: '/api/manager/task/assign',
-    UPDATE_TASK_STATUS: '/api/manager/task/status',
+    MEMBER_DETAIL: '/api/members',
+    TASKS_BY_MEMBER: '/api/tasks/member',
+    ASSIGN_TASK: '/api/tasks',
+    REMIND_CLERICAL: '/api/manager/tasks/:taskId/remind-clerical',
+    UPDATE_TASK_STATUS: '/api/tasks',
     STATS: '/api/manager/stats',
   },
   SPECIALIST: {
     TASKS: '/api/specialist/tasks',
-    TASK_DETAIL: (taskId) => `/api/specialist/tasks/${taskId}`,
-    UPDATE_PROGRESS: (taskId) => `/api/specialist/tasks/${taskId}/progress`,
-    ADD_COMMENT: (taskId) => `/api/specialist/tasks/${taskId}/comment`,
-    SUBMIT: (taskId) => `/api/specialist/tasks/${taskId}/submit`,
-    RESUBMIT: (taskId) => `/api/specialist/tasks/${taskId}/resubmit`,
-    DELETE_FILE: (taskId, fileId) => `/api/specialist/tasks/${taskId}/files/${fileId}`,
+    TASK_DETAIL: '/api/specialist/tasks/:taskId',
+    UPDATE_PROGRESS: '/api/specialist/tasks/:taskId/progress',
+    ADD_COMMENT: '/api/specialist/tasks/:taskId/comment',
+    
+    SUBMIT: '/api/specialist/tasks/:taskId/submit',
+
+    RESUBMIT: '/api/specialist/tasks/:taskId/resubmit',
+    DELETE_FILE: '/api/specialist/tasks/:taskId/files/:fileId',
   }
 };

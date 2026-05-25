@@ -13,7 +13,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { SidebarItem, CopilotSuggestion } from '../components/common/SharedComponents';
-import { Role, User } from '../models/user';
+import { Role, User } from '../models/User.ts';
 import { getAllUsers } from '../service/userService';
 
 

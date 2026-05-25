@@ -21,19 +21,23 @@ import {
   BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User } from '../../models/user';
-import { DocumentTask, Department, KPIStats, LeaderDeptPerformance, DocumentAttachment } from '../../types';
+import { User } from '../../models/User.ts';
+import { Department } from '../../models/Department';
+import { DocumentFile, Document } from '../../models/Document';
+import { KPIStats, LeaderDeptPerformance } from '../../models/Stats';
 import { StatCard, StatusBadge } from '../common/SharedComponents';
 import { leaderService } from '../../service/leaderService';
-import { getDocumentAttachments } from '../../service/clericalService';
+import { getDocumentFiles } from '../../service/clericalService';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, AreaChart, Area } from 'recharts';
 
 export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [activeView, setActiveView] = useState<'List' | 'Chart'>('List');
   const [docView, setDocView] = useState<'pending' | 'approved'>('pending');
-  const [pendingDocs, setPendingDocs] = useState<DocumentTask[]>([]);
-  const [approvedDocs, setApprovedDocs] = useState<DocumentTask[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<DocumentTask | null>(null);
+
+  const [pendingDocs, setPendingDocs] = useState<Document[]>([]);
+  const [approvedDocs, setApprovedDocs] = useState<Document[]>([]);
+
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [stats, setStats] = useState<KPIStats | null>(null);
   const [deptPerformance, setDeptPerformance] = useState<LeaderDeptPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +54,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [directionDescription, setDirectionDescription] = useState('');
   const [isForwardingDoc, setIsForwardingDoc] = useState(false);
 
-  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [attachments, setAttachments] = useState<DocumentFile[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
@@ -64,7 +68,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
         setIsLoadingAttachments(true);
         setAttachmentError(null);
         try {
-          const files = await getDocumentAttachments(selectedDoc.id);
+          const files = await getDocumentFiles(selectedDoc.id);
           const filesArray = Array.isArray(files) ? files : ((files as any).data || []);
           setAttachments(filesArray);
         } catch (err) {
@@ -318,7 +322,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                           }`}>
                             {doc.priority === 'Critical' ? 'HỎA TỐC' : doc.priority === 'High' ? 'KHẨN' : 'THƯỜNG'}
                           </span>
-                          <span className="text-[10px] text-gray-400 font-medium">{formatDate(doc.startTime ?? doc.date)}</span>
+                          <span className="text-[10px] text-gray-400 font-medium">{formatDate(doc.createdAt ?? doc.dueDate)}</span>
                         </div>
                         <h3 className="text-sm font-bold text-text-main group-hover:text-teams-purple transition-colors line-clamp-2">{doc.title}</h3>
                         <div className="mt-2 flex items-center justify-between">
@@ -393,15 +397,15 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                                      <p className="text-sm text-indigo-900/80 leading-relaxed font-medium">
                                        "{selectedDoc.summary}"
                                      </p>
-                                     {selectedDoc.legalWarnings && selectedDoc.legalWarnings.length > 0 && (
+                                     {selectedDoc.legalWarning && selectedDoc.legalWarning === true && (
                                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                                           <div className="flex items-center gap-2 text-red-700 font-bold text-[10px] uppercase mb-1.5">
                                              <ShieldAlert size={14} />
                                              <span>Cảnh báo pháp lý quan trọng</span>
                                           </div>
-                                          <ul className="list-disc list-inside space-y-1 text-xs text-red-900/70 italic">
-                                             {selectedDoc.legalWarnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
-                                          </ul>
+                                          {/* <ul className="list-disc list-inside space-y-1 text-xs text-red-900/70 italic">
+                                             {selectedDoc.legalWarning.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                                          </ul> */}
                                        </div>
                                      )}
                                   </div>
@@ -414,7 +418,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                        <div className="space-y-3">
                           <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Nội dung chi tiết</h4>
                           <div className="p-4 bg-gray-50 border border-gray-100 rounded-lg text-sm text-text-main leading-relaxed shadow-inner">
-                            {selectedDoc.content || "Nội dung văn bản đang được cập nhật..."}
+                            {selectedDoc.description || "Nội dung văn bản đang được cập nhật..."}
                           </div>
                        </div>
 

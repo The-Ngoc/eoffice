@@ -16,7 +16,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-import { User } from '../../models/user';
+import { User } from '../../models/User.ts';
+import { TaskModel } from '../../models/Task';
 import {
   ClericalDocument,
   ClericalDocumentStatus,
@@ -24,17 +25,18 @@ import {
   ClericalUrgency,
   CreateDocumentPayload,
 } from '../../models/clerical';
-import { DocumentAttachment, DocumentFlowHistoryItem } from '../../types';
+import { DocumentFile, DocumentFlowHistoryItem } from '../../models/Document';
 import {
   createDocument,
   deleteDocument,
   getAllDocuments,
-  getDocumentAttachments,
   getDocumentById,
+  getDocumentFiles,
   getDocumentFlowHistory,
   submitDocumentToLeader,
   updateStatus,
 } from '../../service/clericalService';
+import { managerService } from '../../service/ManagerService';
 import VerificationCode from '../common/VerificationCode';
 import { StatCard } from '../common/SharedComponents';
 
@@ -74,8 +76,39 @@ const getFlowHistoryTimestamp = (item: DocumentFlowHistoryItem): number => {
   return 0;
 };
 
+const normalizeHistoryStatus = (status?: string): ClericalFlowStepStatus => {
+  if (!status) return 'Next';
+  const normalized = status.toUpperCase();
+  if (normalized.includes('DONE') || normalized.includes('COMPLETED') || normalized.includes('APPROVED')) {
+    return 'Done';
+  }
+  if (normalized.includes('CURRENT') || normalized.includes('IN_PROGRESS') || normalized.includes('PROCESS')) {
+    return 'Current';
+  }
+  return 'Next';
+};
+
 type NewDocumentField = 'documentNumber' | 'symbol' | 'title' | 'sender' | 'summary';
 type NewDocumentErrors = Partial<Record<NewDocumentField, string>>;
+
+const formatTaskDate = (value?: string | null): string => {
+  if (!value) {
+    return '--';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [documents, setDocuments] = useState<ClericalDocument[]>([]);
@@ -92,10 +125,16 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [attachments, setAttachments] = useState<DocumentFile[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [flowHistory, setFlowHistory] = useState<DocumentFlowHistoryItem[]>([]);
+  const [isFlowHistoryLoading, setIsFlowHistoryLoading] = useState(false);
+  const [flowHistoryError, setFlowHistoryError] = useState<string | null>(null);
+  const [documentTasks, setDocumentTasks] = useState<TaskModel[]>([]);
+  const [isDocumentTasksLoading, setIsDocumentTasksLoading] = useState(false);
+  const [documentTasksError, setDocumentTasksError] = useState<string | null>(null);
 
   const [newDocForm, setNewDocForm] = useState<CreateDocumentPayload>({
     documentNumber: '',
@@ -250,6 +289,119 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     });
   }, [selectedDoc]);
 
+  // Fetch flow history from backend whenever selected document changes
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedDocId) {
+      setFlowHistory([]);
+      return;
+    }
+
+    setIsFlowHistoryLoading(true);
+    setFlowHistoryError(null);
+
+    (async () => {
+      try {
+        const resp = await getDocumentFlowHistory(selectedDocId);
+        console.log('Flow history API response:', resp);
+        const payload = resp.data;
+        console.log('Flow history API response:', payload);
+        const items = payload.flow_history ?? [];
+        if (!cancelled) {
+          setFlowHistory(items);
+        }
+      } catch (err) {
+        console.error('Failed to fetch flow history:', err);
+        if (!cancelled) setFlowHistoryError('Không thể tải lịch sử xử lý.');
+      } finally {
+        if (!cancelled) setIsFlowHistoryLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDocId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedDoc || selectedDoc.status !== 'WAITING_PUBLISH') {
+      setDocumentTasks([]);
+      setDocumentTasksError(null);
+      return;
+    }
+
+    setIsDocumentTasksLoading(true);
+    setDocumentTasksError(null);
+
+    (async () => {
+      try {
+        const tasks = await managerService.getTasksByDocumentId(selectedDoc.id);
+        if (!cancelled) {
+          setDocumentTasks(tasks);
+        }
+      } catch (error) {
+        console.error('Failed to fetch document tasks:', error);
+        if (!cancelled) {
+          setDocumentTasksError('Không thể tải task của văn bản này.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDocumentTasksLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDoc]);
+
+  const displayFlowHistory = useMemo(() => {
+    if (!flowHistory || flowHistory.length === 0) return [];
+
+    return [...flowHistory]
+      .sort((a, b) => getFlowHistoryTimestamp(b) - getFlowHistoryTimestamp(a))
+      .map((item) => ({
+        id: String(item.id),
+        action: item.action ?? item.note ?? 'Đang cập nhật',
+        time: formatFlowHistoryDate(item.processedAt ?? item.updatedAt ?? item.createdAt),
+        // user: item.managerId ?? item.departmentId ?? '',
+        status: normalizeHistoryStatus(item.status),
+      }));
+  }, [flowHistory]);
+
+  // Load attachments for selected document
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedDocId) {
+      setAttachments([]);
+      setAttachmentError(null);
+      return;
+    }
+
+    setIsLoadingAttachments(true);
+    setAttachmentError(null);
+
+    (async () => {
+      try {
+        const files = await getDocumentFiles(selectedDocId);
+        const filesArray = Array.isArray(files) ? files : ((files as any).data || []);
+        if (!cancelled) setAttachments(filesArray as DocumentFile[]);
+      } catch (err) {
+        console.error('Failed to load attachments', err);
+        if (!cancelled) setAttachmentError('Không thể tải tệp đính kèm. Vui lòng thử lại.');
+      } finally {
+        if (!cancelled) setIsLoadingAttachments(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDocId]);
+
   const [showPublishVerification, setShowPublishVerification] = useState(false);
   const [isPublishVerified, setIsPublishVerified] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -366,6 +518,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
         currentDocs.map((doc) => (doc.id === submitted.id ? submitted : doc)),
       );
       setSelectedDocId(submitted.id);
+      // switch to the tab matching the updated status so the document appears in the correct box
+      setActiveTab(submitted.status as ClericalDocumentStatus | 'All');
       setSuccessMessage('Văn bản đã được trình lên Lãnh đạo và đang chờ duyệt.');
     } catch (error) {
       setErrorMessage('Không thể trình văn bản lên Lãnh đạo. Vui lòng thử lại.');
@@ -403,6 +557,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
 
       setDocuments((currentDocs) => currentDocs.map((d) => (d.id === updated.id ? updated : d)));
       setSelectedDocId(updated.id);
+      // ensure published document moves to the 'PUBLISHED' tab
+      setActiveTab(updated.status as ClericalDocumentStatus | 'All');
       setSuccessMessage('Văn bản đã được ban hành.');
       setShowPublishVerification(false);
       setIsPublishVerified(false);
@@ -434,6 +590,14 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
 
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getTaskCompletionDate = (task: TaskModel): string => {
+    if (task.status === 'Completed' && task.updatedAt) {
+      return formatTaskDate(task.updatedAt);
+    }
+
+    return formatTaskDate(task.deadline || task.dueDate || task.updatedAt || null);
   };
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -695,6 +859,106 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </p>
                   </div>
 
+                  {selectedDoc.status === 'WAITING_PUBLISH' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">
+                            Task thuộc văn bản chờ ban hành
+                          </h4>
+                          <p className="mt-1 text-[11px] text-text-secondary">
+                            Hiển thị task liên quan, kèm file đính kèm và ngày hoàn thành/hạn xử lý.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-green-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-green-600 border border-green-100">
+                          {documentTasks.length} task
+                        </span>
+                      </div>
+
+                      {isDocumentTasksLoading ? (
+                        <div className="rounded-xl border border-green-100 bg-white px-4 py-5 text-xs text-text-secondary">
+                          Đang tải task của văn bản...
+                        </div>
+                      ) : documentTasksError ? (
+                        <div className="rounded-xl border border-red-100 bg-white px-4 py-3 text-xs text-red-700">
+                          {documentTasksError}
+                        </div>
+                      ) : documentTasks.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-green-200 bg-white px-4 py-5 text-center text-xs text-text-secondary">
+                          Chưa có task nào được gắn với văn bản này.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {documentTasks.map((task) => (
+                            <div key={task.id} className="rounded-xl border border-green-100 bg-white p-4 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-bold text-text-main line-clamp-1">
+                                    {task.title || task.document?.title || task.documentNumber || task.id}
+                                  </div>
+                                  <p className="mt-1 text-[11px] text-text-secondary line-clamp-2">
+                                    {task.description || task.note || task.document?.description || 'Không có mô tả chi tiết.'}
+                                  </p>
+                                </div>
+                                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${task.status === 'Completed'
+                                    ? 'bg-green-50 text-green-600'
+                                    : task.status === 'Overdue'
+                                      ? 'bg-red-50 text-red-600'
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                  {task.status}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-3">
+                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                  <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                    Người giao
+                                  </div>
+                                  <div className="mt-1 text-xs font-bold text-text-main">
+                                    {task.assigner?.fullName || task.sender || 'Chưa rõ'}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                                  <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                    Ngày hoàn thành / hạn
+                                  </div>
+                                  <div className="mt-1 text-xs font-bold text-text-main">
+                                    {getTaskCompletionDate(task)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {task.files?.length ? (
+                                <div className="mt-3 space-y-2">
+                                  <div className="text-[10px] font-black uppercase tracking-widest text-text-secondary">
+                                    File đính kèm
+                                  </div>
+                                  <div className="space-y-2">
+                                    {task.files.map((file) => (
+                                      <a
+                                        key={file.id}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 transition-colors hover:bg-gray-100"
+                                      >
+                                        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-main">
+                                          {file.nameFile}
+                                        </span>
+                                        <FileText size={12} className="shrink-0 text-teams-purple" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-4 flex items-center gap-2">
                       <History size={14} />
@@ -702,24 +966,47 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </h4>
                     <div className="space-y-6 relative ml-3">
                       <div className="absolute -left-3.25 top-2 bottom-2 w-0.5 bg-gray-100"></div>
-                      {displayFlow.map((step) => (
-                        <div key={step.id} className="relative flex flex-col pl-4">
-                          <FlowStepDot status={step.status} />
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-text-main">{step.action}</span>
-                            <span className="text-[10px] text-gray-400">{step.time}</span>
+                      {isFlowHistoryLoading ? (
+                        <div className="p-2 text-xs text-text-secondary">Đang tải lịch sử xử lý...</div>
+                      ) : flowHistoryError ? (
+                        <div className="p-2 text-xs text-red-600">{flowHistoryError}</div>
+                      ) : displayFlowHistory.length > 0 ? (
+                        displayFlowHistory.map((step) => (
+                          <div key={step.id} className="relative flex flex-col pl-4">
+                            <FlowStepDot status={step.status} />
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-main">{step.action}</span>
+                              <span className="text-[10px] text-gray-400">{step.time}</span>
+                            </div>
+                            {/* <span className="text-[11px] text-text-secondary mt-1">{step.user}</span> */}
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              {step.status === 'Current'
+                                ? 'Đang thực hiện'
+                                : step.status === 'Done'
+                                  ? 'Đã hoàn tất'
+                                  : 'Chờ xử lý'}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
-                          <span className="text-[10px] text-gray-400 mt-0.5">
-                            {step.status === 'Current'
-                              ? 'Đang thực hiện'
-                              : step.status === 'Done'
-                                ? 'Đã hoàn tất'
-                                : 'Chờ xử lý'}
-                          </span>
-                        </div>
-                      ))}
-                      {displayFlow.length === 0 && (
+                        ))
+                      ) : displayFlow.length > 0 ? (
+                        displayFlow.map((step) => (
+                          <div key={step.id} className="relative flex flex-col pl-4">
+                            <FlowStepDot status={step.status} />
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-text-main">{step.action}</span>
+                              <span className="text-[10px] text-gray-400">{step.time}</span>
+                            </div>
+                            <span className="text-[11px] text-text-secondary mt-1">{step.user}</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              {step.status === 'Current'
+                                ? 'Đang thực hiện'
+                                : step.status === 'Done'
+                                  ? 'Đã hoàn tất'
+                                  : 'Chờ xử lý'}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
                         <p className="text-xs text-text-secondary">Chưa có lịch sử xử lý.</p>
                       )}
                     </div>

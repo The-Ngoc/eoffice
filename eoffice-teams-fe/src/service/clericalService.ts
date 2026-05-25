@@ -1,7 +1,8 @@
 import axios from 'axios';
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { DocumentAttachment, DocumentFlowHistoryResponse } from '../types';
+import { DocumentFile ,DocumentFlowHistoryItem } from '../models/Document';
+
 import {
   ApiResponse,
   ClericalDocument,
@@ -105,7 +106,7 @@ export const updateStatus = async (
   id: string,
   status: ClericalDocumentStatus,
 ): Promise<ApiResponse<ClericalDocument>> => {
-  const response = await axiosClient.post(ENDPOINTS.DOCUMENTS.UPDATE_STATUS, { id, status });
+  const response = await axiosClient.put(ENDPOINTS.DOCUMENTS.UPDATE_STATUS, { id, status });
   const payload = response.data as ApiResponse<ClericalDocumentDto>;
 
   return {
@@ -120,14 +121,16 @@ export const deleteDocument = async (id: string): Promise<ApiResponse<null>> => 
   return response.data as ApiResponse<null>;
 };
 
-// Fetch document attachments by document id
-export const getDocumentAttachments = async (id: string): Promise<DocumentAttachment[]> => {
+// Fetch document files by document id
+export const getDocumentFiles = async (id: string): Promise<DocumentFile[]> => {
   const response = await axiosClient.get(`${ENDPOINTS.DOCUMENTS.FILES}/${id}`);
-  return response.data as DocumentAttachment[];
+  return response.data as DocumentFile[];
 };
 
 // Fetch flow history by document id
-export const getDocumentFlowHistory = async (id: string): Promise<ApiResponse<DocumentFlowHistoryResponse>> => {
-  const response = await axiosClient.get(`${ENDPOINTS.DOCUMENTS.FLOW_HISTORY}/${id}`);
-  return response.data as ApiResponse<DocumentFlowHistoryResponse>;
+export const getDocumentFlowHistory = async (id: string): Promise<ApiResponse<DocumentFlowHistoryItem[]>> => {
+  const response = await axiosClient.get(
+    ENDPOINTS.DOCUMENTS.FLOW_HISTORY.replace(':documentId', encodeURIComponent(id)),
+  );
+  return response.data as ApiResponse<DocumentFlowHistoryItem[]>;
 };

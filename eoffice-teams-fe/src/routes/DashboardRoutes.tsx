@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Role, User } from '../models/user';
+import { Role, User } from '../models/User.ts';
 import { LeaderDashboard } from '../components/dashboards/LeaderDashboard';
 import { ClericalDashboard } from '../components/dashboards/ClericalDashboard';
 import { ManagerDashboard } from '../components/dashboards/ManagerDashboard';
