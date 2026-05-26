@@ -16,6 +16,12 @@
   "production": {
     "use_env_variable": "DATABASE_URL",
     "dialect": "mysql",
-    "logging": false
+    "logging": false,
+    "dialectOptions": {
+      "ssl": {
+        "minVersion": "TLSv1.2",
+        "rejectUnauthorized": false
+      }
+    }
   }
 }
