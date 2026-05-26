@@ -3,26 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const Sequelize = require('sequelize');
-const process = require('process');
 const basename = path.basename(__filename);
 
-// 1. Xác định môi trường hiện tại (Render gán NODE_ENV = production)
-const env = process.env.NODE_ENV || 'development';
-
-// 2. Trỏ đúng đường dẫn tới file config.json ở ngoài thư mục gốc
-const config = require(path.resolve('config', 'config.json'))[env];
+// Dùng chung sequelize instance từ src/config/db.js để tránh cấu hình chồng chéo
+const sequelize = require('../config/db');
 const db = {};
-
-let sequelize;
-
-// 3. Nếu môi trường có cấu hình use_env_variable (như khối production ta đã làm)
-if (config && config.use_env_variable) {
-  // Bốc chuỗi connection từ biến DATABASE_URL trên Render
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  // Dùng cho máy local (development)
-  sequelize = new Sequelize(config.database, config.username, config.password, config);
-}
 
 // --- ĐOẠN QUÉT MODEL DƯỚI ĐÂY GIỮ NGUYÊN THEO CODE CŨ CỦA BẠN ---
 fs
