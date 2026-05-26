@@ -1,4 +1,7 @@
-export const API_BE = 'https://eoffice-0qsj.onrender.com';
+export const API_BE = (import.meta.env.VITE_API_BE || 'https://eoffice-0qsj.onrender.com').trim();
+
+export const API_HOST = 'https://localhost:3001';
+
 
 export const ENDPOINTS = {
   USERS: {

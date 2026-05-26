@@ -161,7 +161,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleForward = async () => {
-    if (!selectedDoc || !selectedDept || approvedDocId !== selectedDoc.id) return;
+    if (!selectedDoc || !selectedDept || approvedDocId !== selectedDoc.id || !selectedManager?.managerId || !directionDescription.trim()) return;
     
     setIsForwardingDoc(true);
     try {
@@ -671,7 +671,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </button>
                   <button 
                     onClick={handleForward}
-                    disabled={!selectedDept || approvedDocId !== selectedDoc?.id || !directionDescription.trim() || isForwardingDoc}
+                    disabled={!selectedDept || approvedDocId !== selectedDoc?.id || !selectedManager?.managerId || !directionDescription.trim() || isForwardingDoc}
                     className="flex-1 bg-teams-purple text-white py-3 rounded-xl text-sm font-black shadow-lg shadow-teams-purple/20 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2"
                   >
                     {isForwardingDoc ? (

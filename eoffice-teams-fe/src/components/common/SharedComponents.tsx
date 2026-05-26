@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
-import { DocumentTask } from '../../models/Document';
+import { Document } from '../../models/Document';
 
 export function SidebarItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
   return (
@@ -44,7 +44,7 @@ export function StatCard({ title, value, trend, color }: { title: string, value:
   );
 }
 
-export function StatusBadge({ status }: { status: DocumentTask['status'] }) {
+export function StatusBadge({ status }: { status: Document['status'] }) {
   return (
     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-teams-border text-text-secondary border border-transparent">
       {status === 'Urgent' ? 'Khẩn cấp' : status}
