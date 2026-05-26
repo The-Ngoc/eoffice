@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "seed": "node src/seeds/run-seed.js",
     "db:patch-task-dashboard": "node scripts/patch-task-dashboard-schema.js",
-    "db:migrate": "sequelize-cli db:migrate"
+    "db:migrate": "sequelize-cli db:migrate --env production"
   },
   "keywords": [],
   "author": "",
