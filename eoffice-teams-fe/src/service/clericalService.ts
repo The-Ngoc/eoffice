@@ -91,6 +91,7 @@ export const createDocument = async (
   }
 };
 
+
 export const submitDocumentToLeader = async (id: string): Promise<ApiResponse<ClericalDocument>> => {
   const response = await axiosClient.post(ENDPOINTS.DOCUMENTS.SUBMIT_TO_LEADER, { id });
   const payload = response.data as ApiResponse<ClericalDocumentDto>;

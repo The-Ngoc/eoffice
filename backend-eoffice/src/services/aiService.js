@@ -1,4 +1,7 @@
 const axios = require('axios');
+const Ajv = require('ajv');
+
+const ajv = new Ajv({ allErrors: true, removeAdditional: false });
 
 /**
  * Lấy cấu hình Gemini từ environment variables
@@ -34,9 +37,9 @@ Trả về JSON với cấu trúc sau:
 {
   "docNumber": "Số văn bản/số hiệu",
   "symbol": "Ký hiệu của văn bản",
-  "type": "Loại văn bản (Công văn, Thông tư, Quyết định, v.v.)",
+  "type": "Loại văn bản (ví dụ: Công văn, Quyết định, Báo cáo)",
   "title": "Tiêu đề/Chủ đề chính của văn bản",
-  "content": "Tóm tắt ý chính và nội dung quan trọng",
+  "sumary": "Tóm tắt ý chính và nội dung quan trọng",
   "sender": "Đơn vị/Người gửi/Cơ quan phát hành"
 }`;
 }
@@ -51,6 +54,23 @@ ${documentContent}
 
 Hãy phân tích và trả về JSON với các trường: docNumber, symbol, type, title, content, sender.`;
 }
+
+// JSON schema để validate output từ Gemini
+const structuredSchema = {
+    type: 'object',
+    properties: {
+        docNumber: { type: 'string' },
+        symbol: { type: 'string' },
+        type: { type: 'string' },
+        title: { type: 'string' },
+        content: { type: 'string' },
+        sender: { type: 'string' }
+    },
+    required: ['docNumber', 'symbol', 'type', 'title', 'content', 'sender'],
+    additionalProperties: false
+};
+
+const validateSchema = ajv.compile(structuredSchema);
 
 /**
  * Xây dựng fallback structure khi không thể xử lý từ Gemini
@@ -72,14 +92,35 @@ function buildFallbackStructure(rawContent = '') {
 function parseGeminiResponse(responseText) {
     try {
         const cleaned = String(responseText || '').trim();
-        
-        // Thử match JSON object từ response
+
+        // 1) Thử parse thẳng
+        try {
+            return JSON.parse(cleaned);
+        } catch (e) {
+            // tiếp tục
+        }
+
+        // 2) Nếu model bọc thêm text, thử match JSON object
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+            try {
+                return JSON.parse(jsonMatch[0]);
+            } catch (e) {
+                return null;
+            }
         }
-        
-        // Nếu không tìm thấy, trả về null
+
+        // 3) Nếu model trả mảng chứa object
+        const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+            try {
+                const arr = JSON.parse(arrayMatch[0]);
+                if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === 'object') return arr[0];
+            } catch (e) {
+                // ignore
+            }
+        }
+
         return null;
     } catch (error) {
         console.error('Lỗi parse JSON từ Gemini:', error.message);
@@ -91,12 +132,13 @@ function parseGeminiResponse(responseText) {
  * Validate JSON structure từ Gemini
  */
 function validateStructure(data) {
-    if (!data || typeof data !== 'object') {
-        return false;
-    }
+    if (!data || typeof data !== 'object') return false;
 
-    const requiredFields = ['docNumber', 'symbol', 'type', 'title', 'content', 'sender'];
-    return requiredFields.every((field) => field in data);
+    const valid = validateSchema(data);
+    if (!valid) {
+        console.warn('⚠️ Schema validation failed:', validateSchema.errors);
+    }
+    return valid;
 }
 
 /**
@@ -117,80 +159,96 @@ async function extractStructuredData(documentContent) {
     const userPrompt = buildUserPrompt(documentContent);
     const url = `${endpoint}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    try {
-        const body = {
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        {
-                            text: systemPrompt + '\n\n' + userPrompt
-                        }
-                    ]
+    // Retry config
+    const maxRetries = 3;
+    const baseDelay = 800; // ms
+
+    // Prepare request body: tách rõ role system và user
+    const body = {
+        contents: [
+            { role: 'system', parts: [{ text: systemPrompt }] },
+            { role: 'user', parts: [{ text: userPrompt }] }
+        ],
+        generationConfig: {
+            temperature: 0.0,
+            maxOutputTokens: 1200
+        }
+    };
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            if (attempt > 0) console.log(`🔁 Thử lại Gemini: attempt=${attempt + 1}`);
+            console.log('📤 Gửi request tới Gemini API...');
+            const response = await axios.post(url, body, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+
+            const geminiData = response.data || {};
+            let textOutput = null;
+
+            if (geminiData?.candidates && geminiData.candidates.length > 0) {
+                const candidate = geminiData.candidates[0];
+                if (candidate?.content?.parts && candidate.content.parts.length > 0) {
+                    textOutput = candidate.content.parts.map((part) => part?.text || '').join('');
                 }
-            ],
-            generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 1500
             }
-        };
 
-        console.log('📤 Gửi request tới Gemini API...');
-        const response = await axios.post(url, body, {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 30000
-        });
-
-        // Parse Gemini response
-        const geminiData = response.data || {};
-        let textOutput = null;
-
-        if (geminiData?.candidates && geminiData.candidates.length > 0) {
-            const candidate = geminiData.candidates[0];
-            if (candidate?.content?.parts && candidate.content.parts.length > 0) {
-                textOutput = candidate.content.parts.map((part) => part?.text || '').join('');
+            if (!textOutput) {
+                console.warn('⚠️ Gemini response rỗng, sử dụng fallback');
+                return buildFallbackStructure(documentContent);
             }
-        }
 
-        if (!textOutput) {
-            console.warn('⚠️ Gemini response rỗng, sử dụng fallback');
+            // debug raw response (không log secrets)
+            console.debug('Raw Gemini output:', textOutput.substring(0, 1000));
+
+            const parsed = parseGeminiResponse(textOutput);
+            if (parsed && validateStructure(parsed)) {
+                console.log('✅ Trích xuất thành công từ Gemini');
+                return parsed;
+            }
+
+            console.warn('⚠️ Gemini response không hợp lệ, attempt:', attempt + 1);
+            // Nếu chưa đạt maxRetries, chờ và thử lại
+            if (attempt < maxRetries - 1) {
+                await new Promise((r) => setTimeout(r, baseDelay * Math.pow(2, attempt)));
+                continue;
+            }
+
+            return buildFallbackStructure(documentContent);
+
+        } catch (error) {
+            const statusCode = error?.response?.status;
+            const errorData = error?.response?.data;
+            const errorMessage = errorData?.error?.message || error?.message || 'Lỗi gọi Gemini API';
+
+            console.error('❌ Lỗi gọi Gemini:', {
+                statusCode,
+                message: errorMessage,
+                attempt: attempt + 1,
+                timestamp: new Date().toISOString()
+            });
+
+            // Nếu 401/403: dừng ngay
+            if (statusCode === 401 || statusCode === 403) {
+                throw new Error(`Lỗi xác thực Gemini: ${errorMessage}`);
+            }
+
+            // Nếu 429 (quota) thì fallback ngay
+            if (statusCode === 429) {
+                console.warn('⚠️ Quota Gemini vượt mức, trả về fallback');
+                return buildFallbackStructure(documentContent);
+            }
+
+            // Với các lỗi khác: thử lại theo backoff
+            if (attempt < maxRetries - 1) {
+                await new Promise((r) => setTimeout(r, baseDelay * Math.pow(2, attempt)));
+                continue;
+            }
+
+            console.warn('⚠️ Gemini API lỗi, trả về fallback');
             return buildFallbackStructure(documentContent);
         }
-
-        // Parse JSON từ response
-        const parsed = parseGeminiResponse(textOutput);
-        if (parsed && validateStructure(parsed)) {
-            console.log('✅ Trích xuất thành công từ Gemini');
-            return parsed;
-        }
-
-        console.warn('⚠️ Gemini response không hợp lệ, sử dụng fallback');
-        return buildFallbackStructure(documentContent);
-
-    } catch (error) {
-        const statusCode = error?.response?.status;
-        const errorData = error?.response?.data;
-        const errorMessage = errorData?.error?.message || error?.message || 'Lỗi gọi Gemini API';
-
-        console.error('❌ Lỗi gọi Gemini:', {
-            statusCode,
-            message: errorMessage,
-            timestamp: new Date().toISOString()
-        });
-
-        // Xử lý các lỗi cụ thể
-        if (statusCode === 429) {
-            console.warn('⚠️ Quota Gemini vượt mức, trả về fallback');
-            return buildFallbackStructure(documentContent);
-        }
-
-        if (statusCode === 401 || statusCode === 403) {
-            throw new Error(`Lỗi xác thực Gemini: ${errorMessage}`);
-        }
-
-        // Với các lỗi khác, vẫn trả về fallback để API không fail toàn bộ
-        console.warn('⚠️ Gemini API lỗi, trả về fallback');
-        return buildFallbackStructure(documentContent);
     }
 }
 
