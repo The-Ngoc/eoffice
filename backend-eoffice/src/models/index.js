@@ -23,7 +23,7 @@ fs
   .forEach(file => {
     const model = require(path.join(__dirname, file));
 
-    if (model && typeof model === 'object' && model.name) {
+    if (model && model.name) {
       db[model.name] = model;
     }
   });
