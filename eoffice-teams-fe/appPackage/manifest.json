@@ -6,8 +6,8 @@
     "developer": {
         "name": "eoffice_DUT",
         "websiteUrl": "https://eoffice-hazel.vercel.app",
-        "privacyUrl": "https://eoffice-hazel.vercel.app/privacy",
-        "termsOfUseUrl": "https://eoffice-hazel.vercel.app/termsofuse"
+        "privacyUrl": "https://www.microsoft.com/en-us/privacy/privacystatement",
+        "termsOfUseUrl": "https://www.microsoft.com/en-us/servicesagreement"
     },
     "icons": {
         "color": "color.png",
