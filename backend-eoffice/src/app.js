@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const db = require('./models');
 
 const userRoutes = require('./routes/userRouter');
 const documentRoutes = require('./routes/documentRouter');
@@ -15,9 +14,11 @@ const taskRoutes = require('./routes/taskRoutes');
 
 const app = express();
 app.use(cors());
+app.disable('x-powered-by');
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Health check for deployment platforms like Render
 app.get('/health', (req, res) => {
@@ -29,19 +30,6 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-
-//  Khởi tạo database và đồng bộ các model với database
-async function initializeDatabase() {
-    try {
-        await db.sequelize.sync({ alter: true });
-        console.log('✅ Tất cả bảng đã được tạo/cập nhật thành công');
-    } catch (error) {
-        console.error('❌ Lỗi khi khởi tạo database:', error.message);
-        process.exit(1);
-    }
-}
-
-initializeDatabase();
 
 // Routes
 app.use('/api', userRoutes);
