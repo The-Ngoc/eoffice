@@ -1,4 +1,4 @@
-export const API_BE = 'http://localhost:3001';
+export const API_BE = 'https://eoffice-0qsj.onrender.com';
 
 export const ENDPOINTS = {
   USERS: {
