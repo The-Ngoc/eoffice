@@ -19,9 +19,18 @@ app.use(cors());
 // Middleware
 app.use(express.json());
 
+// Health check for deployment platforms like Render
+app.get('/health', (req, res) => {
+    return res.status(200).json({
+        success: true,
+        status: 'ok',
+        message: 'Backend is healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
 //  Khởi tạo database và đồng bộ các model với database
-
-
 async function initializeDatabase() {
     try {
         await db.sequelize.sync({ alter: true });
