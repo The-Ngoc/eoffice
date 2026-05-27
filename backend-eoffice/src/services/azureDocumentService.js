@@ -133,8 +133,6 @@ async function extractAndProcessDocument(file) {
     }
 
     try {
-        // Step 1: Extract raw content từ Azure Document Intelligence
-        console.log('📄 Bước 1: Trích xuất từ Azure Document Intelligence...');
         const client = ensureClient();
         const { model } = getAzureConfig();
 
@@ -154,9 +152,8 @@ async function extractAndProcessDocument(file) {
         // Step 2: Process qua Gemini để lấy structured data
         console.log('📤 Bước 2: Gửi tới Gemini để xử lý và định dạng...');
         const structuredData = await copilotService.extractStructuredData(rawContent);
-        console.log('✅ Gemini xử lý thành công');
 
-        // Step 3: Return structured data with metadata
+        
         const result_data = {
             fileName: file.originalname,
             mimeType: file.mimetype,

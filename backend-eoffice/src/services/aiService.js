@@ -18,55 +18,81 @@ function getGeminiConfig() {
     };
 }
 
-/**
- * Xây dựng system prompt cho Gemini
- */
 function buildSystemPrompt() {
-    return `Bạn là một chuyên gia xử lý văn bản và tài liệu hành chính.
+  return `Bạn là hệ thống trích xuất dữ liệu văn bản hành chính Việt Nam với độ chính xác cao.
 
-Nhiệm vụ: Đọc nội dung văn bản được trích xuất từ Azure Document Intelligence và trích xuất thông tin cốt lõi để trả về một JSON đúng định dạng.
+BẮT BUỘC làm theo các bước sau:
 
-Yêu cầu:
-1. Trích xuất CHÍNH XÁC các trường được yêu cầu
-2. Nếu không tìm thấy thông tin, hãy đặt giá trị mặc định là "--"
-3. Trường "content" phải là tóm tắt ngắn gọn những ý chính (tối đa 300 ký tự)
-4. Trả về CHÍNH XÁC 1 JSON object, không có text bổ sung
-5. Không bao gồm backticks hoặc code block markers
+BƯỚC 1: Tìm các pattern rõ ràng trong văn bản
 
-Trả về JSON với cấu trúc sau:
+- documentNumber:
+  Tìm dòng chứa "Số:"
+  Regex: Số:\\s*(\\S+)
+  Ví dụ: "Số: 1800/KH-ĐHL" → "1800/KH-ĐHL"
+
+- symbol:
+  Lấy phần sau dấu "/" trong documentNumber
+  Ví dụ: "1800/KH-ĐHL" → "KH-ĐHL"
+
+- issueDate:
+  Tìm dòng chứa "ngày ... tháng ... năm ..."
+  Chuyển về format YYYY-MM-DD
+
+- sender:
+  Lấy dòng in hoa đầu tiên ở đầu văn bản
+  (BỘ..., UBND..., TRƯỜNG...)
+
+- title:
+  Lấy dòng in hoa lớn nằm giữa văn bản (ví dụ: KẾ HOẠCH, QUYẾT ĐỊNH)
+
+BƯỚC 2: Xác định type từ title
+- "KẾ HOẠCH" → Kế hoạch
+- "QUYẾT ĐỊNH" → Quyết định
+- "CÔNG VĂN" → Công văn
+- "BÁO CÁO" → Báo cáo
+
+BƯỚC 3: Tóm tắt (summary)
+- Viết lại nội dung chính (không copy)
+- Tối đa 150 ký tự
+
+BẮT BUỘC:
+- Không được bỏ qua thông tin rõ ràng
+- Không được trả "--"
+- Không được copy nguyên văn vào summary
+- Không thêm giải thích
+
+OUTPUT:
+
 {
-  "docNumber": "Số văn bản/số hiệu",
-  "symbol": "Ký hiệu của văn bản",
-  "type": "Loại văn bản (ví dụ: Công văn, Quyết định, Báo cáo)",
-  "title": "Tiêu đề/Chủ đề chính của văn bản",
-  "sumary": "Tóm tắt ý chính và nội dung quan trọng",
-  "sender": "Đơn vị/Người gửi/Cơ quan phát hành"
+  "documentNumber": "...",
+  "symbol": "...",
+  "type": "...",
+  "title": "...",
+  "summary": "...",
+  "sender": "...",
 }`;
 }
 
-/**
- * Xây dựng user prompt cho Gemini
- */
 function buildUserPrompt(documentContent) {
-    return `Đây là nội dung văn bản được trích xuất từ Azure:
+  return `Phân tích văn bản sau và trích xuất thông tin theo yêu cầu:
 
 ${documentContent}
 
-Hãy phân tích và trả về JSON với các trường: docNumber, symbol, type, title, content, sender.`;
+Chỉ trả về JSON hợp lệ.`;
 }
 
 // JSON schema để validate output từ Gemini
 const structuredSchema = {
     type: 'object',
     properties: {
-        docNumber: { type: 'string' },
+        documentNumber: { type: 'string' },
         symbol: { type: 'string' },
         type: { type: 'string' },
         title: { type: 'string' },
-        content: { type: 'string' },
-        sender: { type: 'string' }
+        summary: { type: 'string' },
+        sender: { type: 'string' },
     },
-    required: ['docNumber', 'symbol', 'type', 'title', 'content', 'sender'],
+    required: ['documentNumber', 'symbol', 'type', 'title', 'summary', 'sender'],
     additionalProperties: false
 };
 
@@ -77,12 +103,12 @@ const validateSchema = ajv.compile(structuredSchema);
  */
 function buildFallbackStructure(rawContent = '') {
     return {
-        docNumber: '--',
+        documentNumber: '--',
         symbol: '--',
         type: 'Tài liệu',
         title: 'Tài liệu từ Azure',
-        content: rawContent.substring(0, 300) || 'Không thể tóm tắt nội dung',
-        sender: '--'
+        summary: rawContent.substring(0, 200) || 'Không thể tóm tắt nội dung',
+        sender: '--',
     };
 }
 
@@ -148,6 +174,7 @@ async function extractStructuredData(documentContent) {
     if (!documentContent || String(documentContent).trim().length === 0) {
         throw new Error('Nội dung tài liệu trống');
     }
+    console.log(documentContent.toString());
 
     const { endpoint, apiKey, model } = getGeminiConfig();
 
@@ -178,7 +205,6 @@ async function extractStructuredData(documentContent) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             if (attempt > 0) console.log(`🔁 Thử lại Gemini: attempt=${attempt + 1}`);
-            console.log('📤 Gửi request tới Gemini API...');
             const response = await axios.post(url, body, {
                 headers: { 'Content-Type': 'application/json' },
                 timeout: 30000

@@ -1,5 +1,6 @@
 const documentService = require('../services/documentService');
 const azureDocumentService = require('../services/azureDocumentService');
+const documentPipeline = require('../services/documentPipeline');
 
 function sendSuccess(res, data, message, statusCode = 200) {
     return res.status(statusCode).json({
@@ -102,9 +103,19 @@ exports.getDocumentStats = async (req, res) => {
 
 exports.extractAzureContent = async (req, res) => {
     try {
-        console.log('controlle done')
-        const extracted = await azureDocumentService.extractAndProcessDocument(req.file);
-        return sendSuccess(res, extracted, 'Trích xuất và xử lý nội dung từ Azure thành công');
+        // Phương án B: Azure OCR → Regex Parse → Gemini Summary
+        if (!req.file) {
+            return sendError(res, {
+                message: 'File là bắt buộc',
+                statusCode: 400
+            });
+        }
+
+        console.log('📄 Endpoint: Extract document content');
+        const result = await documentPipeline.processDocument(req.file);
+
+        return sendSuccess(res, result.data, 'Trích xuất tài liệu thành công', 200);
+
     } catch (error) {
         console.error('❌ Lỗi khi trích xuất nội dung từ Azure:', error);
         return sendError(res, error);
