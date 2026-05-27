@@ -1,6 +1,20 @@
-export const API_BE = (import.meta.env.VITE_API_BE || 'https://eoffice-0qsj.onrender.com').trim();
+const LOCAL_API_BE = 'http://localhost:3001';
+const REMOTE_API_BE = 'https://eoffice-0qsj.onrender.com';
 
-export const API_HOST = 'https://localhost:3001';
+const resolveDefaultApiBaseUrl = () => {
+  if (typeof window === 'undefined') {
+    return REMOTE_API_BE;
+  }
+
+  const { hostname } = window.location;
+  const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+  return isLocalHost ? LOCAL_API_BE : REMOTE_API_BE;
+};
+
+export const API_BE = (import.meta.env.VITE_API_BE || resolveDefaultApiBaseUrl()).trim();
+
+export const API_HOST = API_BE;
 
 
 export const ENDPOINTS = {
@@ -20,6 +34,7 @@ export const ENDPOINTS = {
     DELETE: '/api/document/delete',
     FILES: '/api/document/files',
     FLOW_HISTORY: '/api/documents/:documentId/flow-history',
+    EXTRACT_CONTENT: '/api/document/extract-azure-content',
   },
   LEADER: {
     WAITING_LEADER_DOCUMENTS: '/api/leader/documents/waiting-leader',
@@ -52,10 +67,8 @@ export const ENDPOINTS = {
     TASKS: '/api/specialist/tasks',
     TASK_DETAIL: '/api/specialist/tasks/:taskId',
     UPDATE_PROGRESS: '/api/specialist/tasks/:taskId/progress',
-    ADD_COMMENT: '/api/specialist/tasks/:taskId/comment',
-    
+    ADD_COMMENT: '/api/specialist/tasks/:taskId/comment', 
     SUBMIT: '/api/specialist/tasks/:taskId/submit',
-
     RESUBMIT: '/api/specialist/tasks/:taskId/resubmit',
     DELETE_FILE: '/api/specialist/tasks/:taskId/files/:fileId',
   }

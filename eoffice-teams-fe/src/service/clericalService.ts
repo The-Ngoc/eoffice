@@ -1,7 +1,7 @@
 import axios from 'axios';
 import axiosClient from '../api/axiosClient';
 import { ENDPOINTS } from '../config/apiConfig';
-import { DocumentFile ,DocumentFlowHistoryItem } from '../models/Document';
+import { DocumentAiExtracted, DocumentFile ,DocumentFlowHistoryItem } from '../models/Document';
 
 import {
   ApiResponse,
@@ -134,4 +134,32 @@ export const getDocumentFlowHistory = async (id: string): Promise<ApiResponse<Do
     ENDPOINTS.DOCUMENTS.FLOW_HISTORY.replace(':documentId', encodeURIComponent(id)),
   );
   return response.data as ApiResponse<DocumentFlowHistoryItem[]>;
+};
+
+
+
+export const extractDocumentContent = async (files: File[]): Promise<ApiResponse<DocumentAiExtracted>> => {
+  const formData = new FormData();
+  const primaryFile = files[0];
+
+  if (!primaryFile) {
+    throw new Error('No file provided for extraction');
+  }
+
+  // Backend endpoint expects a single uploaded file.
+  formData.append('file', primaryFile);
+
+  try {
+    const response = await axiosClient.post(ENDPOINTS.DOCUMENTS.EXTRACT_CONTENT, formData);
+    console.log('📤 Extract content response:', response.data);
+    return response.data as ApiResponse<DocumentAiExtracted>;
+  } catch (error) {
+    // Fallback for backends that still read the older `files` field name.
+    const fallbackForm = new FormData();
+    fallbackForm.append('files', primaryFile);
+
+    const fallbackResponse = await axiosClient.post(ENDPOINTS.DOCUMENTS.EXTRACT_CONTENT, fallbackForm);
+    console.log('📤 Extract content fallback response:', fallbackResponse.data);
+    return fallbackResponse.data as ApiResponse<DocumentAiExtracted>;
+  }
 };

@@ -35,6 +35,7 @@ import {
   getDocumentFlowHistory,
   submitDocumentToLeader,
   updateStatus,
+  extractDocumentContent,
 } from '../../service/clericalService';
 import { managerService } from '../../service/ManagerService';
 import VerificationCode from '../common/VerificationCode';
@@ -125,6 +126,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAiSummarizing, setIsAiSummarizing] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<DocumentFile[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -303,10 +306,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     (async () => {
       try {
         const resp = await getDocumentFlowHistory(selectedDocId);
-        console.log('Flow history API response:', resp);
-        const payload = resp.data;
-        console.log('Flow history API response:', payload);
-        const items = payload.flow_history ?? [];
+        const items = resp.flow_history ?? [];
         if (!cancelled) {
           setFlowHistory(items);
         }
@@ -607,22 +607,52 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
       return;
     }
 
-    setSelectedFiles((currentFiles) => {
-      const mergedFiles = [...currentFiles, ...pickedFiles];
+    // merge and dedupe
+    const merged = [...selectedFiles, ...pickedFiles].filter(
+      (file, index, array) =>
+        index ===
+        array.findIndex(
+          (item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified,
+        ),
+    );
 
-      return mergedFiles.filter(
-        (file, index, array) =>
-          index ===
-          array.findIndex(
-            (item) =>
-              item.name === file.name &&
-              item.size === file.size &&
-              item.lastModified === file.lastModified,
-          ),
-      );
-    });
-
+    setSelectedFiles(merged);
     event.target.value = '';
+
+    // Start extraction call
+    (async () => {
+      setIsExtracting(true);
+      setExtractError(null);
+      setErrorMessage(null);
+      try {
+        const resp = await extractDocumentContent(pickedFiles);
+        const extracted = (resp.data as any)?.data ?? resp.data ?? {};
+
+        const sanitize = (v: any) => {
+          if (v === null || v === undefined) return '';
+          const s = String(v).trim();
+          if (s === '--') return '';
+          return s;
+        };
+
+        if (extracted) {
+          setNewDocForm((current) => ({
+            ...current,
+            documentNumber: sanitize(extracted.documentNumber ?? extracted.docNumber),
+            symbol: sanitize(extracted.symbol),
+            sender: sanitize(extracted.sender),
+            title: sanitize(extracted.title),
+            summary: sanitize(extracted.summary ?? extracted.excerpt ?? extracted.content),
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to extract document content:', err);
+        setExtractError('Không thể trích xuất nội dung từ tệp. Vui lòng thử lại.');
+        setErrorMessage('Không thể trích xuất nội dung từ tệp. Vui lòng thử lại.');
+      } finally {
+        setIsExtracting(false);
+      }
+    })();
   };
 
   const removeSelectedFile = (targetFile: File) => {
@@ -1161,10 +1191,12 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
 
               <div className="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
-                <div
-                  className="border-2 border-dashed border-teams-purple/30 rounded-lg p-8 text-center bg-teams-purple/5 hover:bg-teams-purple/10 transition-all cursor-pointer group"
-                  onClick={openFilePicker}
-                >
+                <div className="relative">
+                  <div
+                    className="border-2 border-dashed border-teams-purple/30 rounded-lg p-8 text-center bg-teams-purple/5 hover:bg-teams-purple/10 transition-all cursor-pointer group"
+                    onClick={isExtracting ? undefined : openFilePicker}
+                    aria-disabled={isExtracting}
+                  >
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1179,6 +1211,16 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <p className="text-[10px] text-teams-purple mt-2 font-semibold">
                     {selectedFileCount > 0 ? `Đã chọn ${selectedFileCount} tệp` : 'Nhấn để mở hộp chọn tệp'}
                   </p>
+                  </div>
+
+                  {isExtracting && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teams-purple"></div>
+                        <span className="text-sm font-semibold text-text-main">Đang phân tích tệp...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {selectedFiles.length > 0 && (
@@ -1232,6 +1274,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                       className={getNewDocFieldClass('documentNumber')}
                       placeholder="123..."
                       aria-invalid={Boolean(newDocErrors.documentNumber)}
+                      disabled={isExtracting || isSaving}
                     />
                     {renderNewDocError('documentNumber')}
                   </div>
@@ -1244,6 +1287,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                       className={getNewDocFieldClass('symbol')}
                       placeholder="CV-VP..."
                       aria-invalid={Boolean(newDocErrors.symbol)}
+                      disabled={isExtracting || isSaving}
                     />
                     {renderNewDocError('symbol')}
                   </div>
@@ -1253,6 +1297,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                       value={newDocForm.type}
                       onChange={(event) => setNewDocForm((current) => ({ ...current, type: event.target.value }))}
                       className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none bg-white"
+                      disabled={isExtracting || isSaving}
                     >
                       <option>Công văn</option>
                       <option>Quyết định</option>
@@ -1267,6 +1312,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                         setNewDocForm((current) => ({ ...current, urgency: event.target.value as ClericalUrgency }))
                       }
                       className="w-full px-3 py-2 border border-teams-border rounded text-sm outline-none bg-white"
+                      disabled={isExtracting || isSaving}
                     >
                       <option value="Thường">Thường</option>
                       <option value="Khẩn">Khẩn</option>
@@ -1284,6 +1330,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     className={getNewDocFieldClass('sender')}
                     placeholder="Tên phòng ban/đơn vị gửi..."
                     aria-invalid={Boolean(newDocErrors.sender)}
+                    disabled={isExtracting || isSaving}
                   />
                   {renderNewDocError('sender')}
                 </div>
@@ -1297,6 +1344,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     className={getNewDocFieldClass('title')}
                     placeholder="Tiêu đề chính của văn bản..."
                     aria-invalid={Boolean(newDocErrors.title)}
+                    disabled={isExtracting || isSaving}
                   />
                   {renderNewDocError('title')}
                 </div>
@@ -1309,6 +1357,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     className={`${getNewDocFieldClass('summary')} h-24`}
                     placeholder="Tóm tắt ngắn gọn nội dung văn bản..."
                     aria-invalid={Boolean(newDocErrors.summary)}
+                    disabled={isExtracting || isSaving}
                   ></textarea>
                   {renderNewDocError('summary')}
                 </div>
@@ -1319,6 +1368,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                     checked={newDocForm.legalWarning}
                     onChange={(e) => setNewDocForm((current) => ({ ...current, legalWarning: e.target.checked }))}
                     className="w-4 h-4 rounded cursor-pointer"
+                    disabled={isExtracting || isSaving}
                   />
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={16} className="text-amber-600 shrink-0" />
@@ -1327,7 +1377,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </label>
               </div>
 
-              <div className="p-5 bg-gray-50 flex justify-end gap-3 border-t border-teams-border">
+                <div className="p-5 bg-gray-50 flex justify-end gap-3 border-t border-teams-border">
                 <button
                   onClick={() => {
                     setIsUploadModalOpen(false);
@@ -1338,8 +1388,8 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 >
                   Hủy
                 </button>
-                <button onClick={handleCreateDocument} className="btn-primary px-8 py-2 shadow-md" disabled={isSaving}>
-                  {isSaving ? 'Đang lưu...' : 'Hoàn tất & Lưu sổ'}
+                <button onClick={handleCreateDocument} className="btn-primary px-8 py-2 shadow-md" disabled={isSaving || isExtracting}>
+                  {isSaving ? 'Đang lưu...' : isExtracting ? 'Đang phân tích...' : 'Hoàn tất & Lưu sổ'}
                 </button>
               </div>
             </motion.div>

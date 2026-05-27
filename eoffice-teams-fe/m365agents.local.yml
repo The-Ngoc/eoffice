@@ -66,6 +66,7 @@ deploy:
     with:
       target: ./.localConfigs
       envs:
+        VITE_API_BE: http://localhost:3001
         PORT: 3978
         SSL_CRT_FILE: ${{SSL_CRT_FILE}}
         SSL_KEY_FILE: ${{SSL_KEY_FILE}}

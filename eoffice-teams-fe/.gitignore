@@ -10,8 +10,11 @@ node_modules/
 
 # misc
 .env
+.env.development.local
 .deployment
 .DS_Store
+
+dist
 
 # build
 lib/

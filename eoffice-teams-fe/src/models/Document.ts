@@ -9,12 +9,23 @@ export interface DocumentFlowHistoryItem {
   id: string;
   status: 'Create' | 'Pending' | 'Processing' | 'Completed' | 'Rejected' | 'Urgent' | 'Done';
   action: string;
+  flow_history?: string[] | null;
   note: string | null;
   processedAt?: string | Record<string, unknown> | null;
   createdAt?: string | Record<string, unknown> | null;
   updatedAt?: string | Record<string, unknown> | null;
 }
 
+export interface DocumentAiExtracted {
+  docNumber?: string;
+  documentNumber?: string; 
+  symbol?: string;
+  title?: string;
+  sender?: string;
+  summary?: string;
+  excerpt?: string;
+  content?: string;
+}
 
 
 export interface Document {
