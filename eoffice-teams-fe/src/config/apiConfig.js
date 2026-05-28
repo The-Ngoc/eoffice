@@ -18,6 +18,9 @@ export const API_HOST = API_BE;
 
 
 export const ENDPOINTS = {
+  RAG: {
+    CHAT: '/api/chat',
+  },
   USERS: {
     USER: '/api/user',
     ADD: '/api/user/add',

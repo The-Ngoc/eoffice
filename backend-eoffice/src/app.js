@@ -10,6 +10,8 @@ const specialistRoutes = require('./routes/specialistRoutes');
 const cloudinaryRoutes = require('./routes/cloudinaryRoutes');
 const departmentMemberRoutes = require('./routes/departmentMemberRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const { getVectorCount } = require('./services/chatService');
 
 
 const app = express();
@@ -21,11 +23,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check for deployment platforms like Render
-app.get('/health', (req, res) => {
+app.get('/health', async (_req, res) => {
+    const vectorCount = await getVectorCount().catch(() => 0);
+
     return res.status(200).json({
-        success: true,
-        status: 'ok',
-        message: 'Backend is healthy',
+        ok: true,
+        vectorCount,
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
@@ -39,9 +42,11 @@ app.use('/api', workflowRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/specialist', specialistRoutes);
 app.use('/api/cloudinary', cloudinaryRoutes);
+app.use('/api', chatRoutes);
 
 app.use('/api', departmentMemberRoutes);
 app.use('/api', taskRoutes);
+
 
 
 

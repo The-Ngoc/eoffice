@@ -52,9 +52,13 @@ export function StatusBadge({ status }: { status: Document['status'] }) {
   );
 }
 
-export function CopilotSuggestion({ text }: { text: string }) {
+export function CopilotSuggestion({ text, onClick }: { text: string, onClick?: () => void }) {
   return (
-    <button className="w-full text-left p-3 rounded border border-teams-border bg-white hover:border-[#A18CD1] transition-all text-xs text-text-main flex items-center justify-between group">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left p-3 rounded border border-teams-border bg-white hover:border-[#A18CD1] transition-all text-xs text-text-main flex items-center justify-between group"
+    >
       <span className="flex-1">{text}</span>
       <ArrowRight size={12} className="text-gray-300 group-hover:text-[#A18CD1]" />
     </button>
