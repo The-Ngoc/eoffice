@@ -37,6 +37,7 @@ const DOCUMENT_STATUS = {
   ASSIGNED: 'ASSIGNED',              // ÄÃ£ giao phÃ²ng ban
   PROCESSING: 'PROCESSING',          // PhÃ²ng ban Ä‘ang xá»­ lÃ½
   COMPLETED: 'COMPLETED',            // HoÃ n thÃ nh
+  PUBLISHED: 'PUBLISHED',            // ÄÃ£ ban hÃ nh
   REJECTED: 'REJECTED'               // Tá»« chá»‘i
 };
 
@@ -47,6 +48,7 @@ const DOCUMENT_STATUS_DISPLAY = {
   ASSIGNED: 'ÄÃ£ giao phÃ²ng',
   PROCESSING: 'Äang xá»­ lÃ½',
   COMPLETED: 'HoÃ n thÃ nh',
+  PUBLISHED: 'ÄÃ£ ban hÃ nh',
   REJECTED: 'Tá»« chá»‘i'
 };
 

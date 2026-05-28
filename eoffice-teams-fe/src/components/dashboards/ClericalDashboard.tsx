@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Zap,
   AlertTriangle,
+  Stamp,
 } from 'lucide-react';
 
 import { User } from '../../models/User.ts';
@@ -34,12 +35,12 @@ import {
   getDocumentFiles,
   getDocumentFlowHistory,
   submitDocumentToLeader,
-  updateStatus,
   extractDocumentContent,
+  sealDocument,
 } from '../../service/clericalService';
 import { managerService } from '../../service/ManagerService';
-import VerificationCode from '../common/VerificationCode';
 import { StatCard } from '../common/SharedComponents';
+import { toDisplayFiles } from '../../utils/fileDisplay';
 
 const formatFlowHistoryDate = (value?: string | Record<string, unknown> | null): string => {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -387,8 +388,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     (async () => {
       try {
         const files = await getDocumentFiles(selectedDocId);
-        const filesArray = Array.isArray(files) ? files : ((files as any).data || []);
-        if (!cancelled) setAttachments(filesArray as DocumentFile[]);
+        if (!cancelled) setAttachments(files);
       } catch (err) {
         console.error('Failed to load attachments', err);
         if (!cancelled) setAttachmentError('Không thể tải tệp đính kèm. Vui lòng thử lại.');
@@ -402,8 +402,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     };
   }, [selectedDocId]);
 
-  const [showPublishVerification, setShowPublishVerification] = useState(false);
-  const [isPublishVerified, setIsPublishVerified] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handleSelectDocument = async (id: string) => {
@@ -529,22 +527,6 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleStartPublishFlow = () => {
-    setShowPublishVerification(true);
-    setIsPublishVerified(false);
-    setErrorMessage(null);
-  };
-
-  const handleVerificationSuccess = () => {
-    setIsPublishVerified(true);
-    setErrorMessage(null);
-  };
-
-  const handlePublishCancel = () => {
-    setShowPublishVerification(false);
-    setIsPublishVerified(false);
-  };
-
   const handlePublishConfirm = async () => {
     if (!selectedDoc) return;
     setIsPublishing(true);
@@ -552,19 +534,19 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
     setSuccessMessage(null);
 
     try {
-      const response = await updateStatus(selectedDoc.id, 'PUBLISHED' as ClericalDocumentStatus);
-      const updated = response.data;
+      const response = await sealDocument(selectedDoc.id);
+      const updated = response.data.document;
 
       setDocuments((currentDocs) => currentDocs.map((d) => (d.id === updated.id ? updated : d)));
       setSelectedDocId(updated.id);
-      // ensure published document moves to the 'PUBLISHED' tab
+      if (response.data.sealedFile) {
+        setAttachments((current) => [response.data.sealedFile as DocumentFile, ...current]);
+      }
       setActiveTab(updated.status as ClericalDocumentStatus | 'All');
-      setSuccessMessage('Văn bản đã được ban hành.');
-      setShowPublishVerification(false);
-      setIsPublishVerified(false);
+      setSuccessMessage('Văn bản đã được đóng dấu PDF và ban hành.');
     } catch (error) {
-      setErrorMessage('Không thể ban hành văn bản. Vui lòng thử lại.');
-      console.error('Failed to publish document:', error);
+      setErrorMessage('Không thể đóng dấu và ban hành văn bản. Vui lòng thử lại.');
+      console.error('Failed to seal and publish document:', error);
     } finally {
       setIsPublishing(false);
     }
@@ -891,6 +873,22 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
 
                   {selectedDoc.status === 'WAITING_PUBLISH' && (
                     <div className="space-y-3">
+                      <div className="rounded-2xl border border-red-100 bg-red-50/70 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 rounded-xl bg-white p-2 text-red-600 shadow-sm">
+                            <Stamp size={18} />
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-red-700">
+                              Sẵn sàng đóng dấu ban hành
+                            </h4>
+                            <p className="mt-1 text-[11px] font-medium leading-relaxed text-red-900/70">
+                              Hệ thống sẽ tạo bản PDF có dấu đỏ, số văn bản và ngày ban hành {new Date().toLocaleDateString('vi-VN')}, sau đó lưu bản đã đóng dấu vào tệp đính kèm.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">
@@ -965,7 +963,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                                     File đính kèm
                                   </div>
                                   <div className="space-y-2">
-                                    {task.files.map((file) => (
+                                    {toDisplayFiles(task.files).map((file) => (
                                       <a
                                         key={file.id}
                                         href={file.url}
@@ -974,7 +972,7 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                                         className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 transition-colors hover:bg-gray-100"
                                       >
                                         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-main">
-                                          {file.nameFile}
+                                          {file.name}
                                         </span>
                                         <FileText size={12} className="shrink-0 text-teams-purple" />
                                       </a>
@@ -1063,10 +1061,10 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {attachments.map((file) => (
+                          {toDisplayFiles(attachments).map((file) => (
                             <a
                               key={file.id}
-                              href={file.file_url}
+                              href={file.url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group hover:bg-gray-50 text-left"
@@ -1077,9 +1075,9 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                               <div className="flex-1 overflow-hidden">
                                 <p
                                   className="text-xs font-bold text-text-main truncate group-hover:text-teams-purple transition-colors"
-                                  title={file.file_name}
+                                  title={file.name}
                                 >
-                                  {file.file_name}
+                                  {file.name}
                                 </p>
                                 <p className="text-[10px] text-gray-400 truncate">Nhấn để xem / tải về</p>
                               </div>
@@ -1094,44 +1092,16 @@ export const ClericalDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <div className="p-5 border-t border-teams-border bg-gray-50/30 flex flex-col gap-3">
                   {canPublish ? (
                     <div className="space-y-3">
-                      {!showPublishVerification && (
-                        <button
-                          className="w-full bg-teams-purple text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-teams-purple/90 transition-all"
-                          onClick={handleStartPublishFlow}
-                          disabled={isPublishing}
-                        >
-                          <Send size={14} /> Ký ban hành
-                        </button>
-                      )}
-
-                      {showPublishVerification && (
-                        <div className="bg-white p-3 rounded border border-teams-border">
-                          <VerificationCode
-                            expectedCode="123456"
-                            onSuccess={handleVerificationSuccess}
-                            onCancel={handlePublishCancel}
-                          />
-
-                          {isPublishVerified && (
-                            <div className="mt-3 flex gap-2">
-                              <button
-                                className="flex-1 bg-green-600 text-white py-2 rounded text-xs font-bold"
-                                onClick={handlePublishConfirm}
-                                disabled={isPublishing}
-                              >
-                                {isPublishing ? 'Đang ban hành...' : 'Ban hành'}
-                              </button>
-                              <button
-                                className="px-4 py-2 text-sm font-bold text-text-secondary border rounded"
-                                onClick={handlePublishCancel}
-                                disabled={isPublishing}
-                              >
-                                Hủy
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <button
+                        className="w-full bg-teams-purple text-white py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-teams-purple/90 transition-all disabled:opacity-60"
+                        onClick={handlePublishConfirm}
+                        disabled={isPublishing}
+                      >
+                        <Stamp size={14} /> {isPublishing ? 'Đang đóng dấu...' : 'Đóng dấu & ban hành'}
+                      </button>
+                      <p className="text-[10px] text-text-secondary font-medium leading-relaxed">
+                        Đã bỏ bước nhập mã 6 số. Bản PDF sau khi đóng dấu sẽ xuất hiện trong danh sách tệp đính kèm.
+                      </p>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">

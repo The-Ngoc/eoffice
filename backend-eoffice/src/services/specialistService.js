@@ -35,7 +35,21 @@ function mapTask(task) {
         document: item.document ? {
             id: item.document.id,
             documentNumber: item.document.documentNumber,
-            title: item.document.title
+            symbol: item.document.symbol || null,
+            title: item.document.title,
+            sender: item.document.sender || null,
+            type: item.document.type || null,
+            summary: item.document.summary || null,
+            status: item.document.status || null,
+            priority: item.document.priority || null,
+            urgency: item.document.urgency || null,
+            createdAt: item.document.createdAt || null,
+            files: Array.isArray(item.document.files) ? item.document.files.map((file) => ({
+                id: file.id,
+                file_name: file.nameFile,
+                file_url: file.url,
+                createdAt: file.createdAt
+            })) : []
         } : null
     };
 }
@@ -205,9 +219,7 @@ async function submitTask(taskId, payload = {}, files = [], requester = {}, opti
     const transaction = await sequelize.transaction();
 
     try {
-        if (isResubmission) {
-            await specialistRepository.deleteTaskFiles(taskId, { transaction });
-        }
+        await specialistRepository.deleteTaskFiles(taskId, { transaction });
 
         const taskFiles = [];
         if (Array.isArray(files) && files.length > 0) {

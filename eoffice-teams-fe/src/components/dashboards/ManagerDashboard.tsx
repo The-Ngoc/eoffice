@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileText,
   Users,
@@ -26,6 +26,7 @@ import { managerService } from '../../service/ManagerService';
 import { StatCard } from '../common/SharedComponents';
 import { departmentMemberService } from '../../service/DepartmentMemberService';
 import { getDocumentFiles } from '../../service/clericalService';
+import { toDisplayFiles } from '../../utils/fileDisplay';
 
 type PriorityFilter = 'Low' | 'Medium' | 'High' | 'Critical';
 
@@ -33,6 +34,8 @@ type ActionMessage = {
   type: 'success' | 'error';
   text: string;
 };
+
+type AssignFieldErrors = Partial<Record<'deadline', string>>;
 
 const priorityLabelMap: Record<PriorityFilter, string> = {
   Low: 'THƯỜNG',
@@ -81,6 +84,16 @@ const getLeaderTaskOwnerName = (task?: TaskLeader | null) => {
 
 const getLeaderTaskFiles = (task?: TaskLeader | null) => {
   return task?.document?.files ?? [];
+};
+
+const getLocalDateTimeInputValue = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 const getLeaderTaskHistory = (task?: TaskLeader | null) => {
@@ -198,8 +211,12 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [documentAttachments, setDocumentAttachments] = useState<DocumentFile[]>([]);
+  const [leaderTaskAttachments, setLeaderTaskAttachments] = useState<DocumentFile[]>([]);
+  const [isLoadingLeaderTaskAttachments, setIsLoadingLeaderTaskAttachments] = useState(false);
+  const [leaderTaskAttachmentsError, setLeaderTaskAttachmentsError] = useState('');
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
   const [assignError, setAssignError] = useState('');
+  const [assignFieldErrors, setAssignFieldErrors] = useState<AssignFieldErrors>({});
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [reminderMessage, setReminderMessage] = useState('');
@@ -279,6 +296,7 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
     setSelectedFiles([]);
     setDocumentAttachments([]);
     setAssignError('');
+    setAssignFieldErrors({});
     setNewTask({
       title: '',
       description: '',
@@ -321,6 +339,26 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const validateAssignDeadline = (deadline?: string) => {
+    const value = String(deadline || '').trim();
+
+    if (!value) {
+      return null;
+    }
+
+    const selectedDate = new Date(value);
+    if (Number.isNaN(selectedDate.getTime())) {
+      return 'Định dạng thời hạn không hợp lệ. Vui lòng chọn lại ngày giờ.';
+    }
+
+    const now = new Date();
+    if (selectedDate.getTime() <= now.getTime()) {
+      return 'Thời hạn phải lớn hơn thời điểm hiện tại.';
+    }
+
+    return null;
+  };
+
   const handleCreateTask = async () => {
     if (activeTab === 'LeaderTasks' && !getTaskDocumentId(selectedLeaderTask)) {
       setAssignError('Hãy chọn một task chỉ đạo có documentId để phân công.');
@@ -340,13 +378,16 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
       setAssignError('Vui lòng chọn một chuyên viên để phân công.');
       return;
     }
-    if (newTask.deadline && isNaN(new Date(newTask.deadline).getTime())) {
-      setAssignError('Định dạng thời hạn không hợp lệ. Vui lòng chọn ngày giờ.');
+    const deadlineError = validateAssignDeadline(newTask.deadline);
+    if (deadlineError) {
+      setAssignFieldErrors({ deadline: deadlineError });
+      setAssignError(deadlineError);
       return;
     }
 
     setIsSubmittingTask(true);
     setAssignError('');
+    setAssignFieldErrors({});
 
     try {
       const createdTask = await managerService.createTask(
@@ -593,6 +634,54 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
 
     loadDocumentAttachments();
   }, [showAssignModal, assignSourceDocumentId]);
+
+  useEffect(() => {
+    const documentId = getTaskDocumentId(selectedLeaderTask);
+
+    if (activeTab !== 'LeaderTasks' || !selectedLeaderTask || !documentId) {
+      setLeaderTaskAttachments([]);
+      setLeaderTaskAttachmentsError('');
+      setIsLoadingLeaderTaskAttachments(false);
+      return;
+    }
+
+    const existingFiles = getLeaderTaskFiles(selectedLeaderTask);
+    if (existingFiles.length > 0) {
+      setLeaderTaskAttachments(existingFiles);
+      setLeaderTaskAttachmentsError('');
+      setIsLoadingLeaderTaskAttachments(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsLoadingLeaderTaskAttachments(true);
+    setLeaderTaskAttachmentsError('');
+
+    const loadFiles = async () => {
+      try {
+        const files = await getDocumentFiles(String(documentId));
+        if (isActive) {
+          setLeaderTaskAttachments(files || []);
+        }
+      } catch (err) {
+        console.error('Failed to load leader task attachments', err);
+        if (isActive) {
+          setLeaderTaskAttachments([]);
+          setLeaderTaskAttachmentsError('Không thể tải tệp đính kèm.');
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingLeaderTaskAttachments(false);
+        }
+      }
+    };
+
+    loadFiles();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeTab, selectedLeaderTask]);
 
   useEffect(() => {
     const documentId = selectedTaskDocumentId;
@@ -935,19 +1024,42 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     </div>
 
-                    {getLeaderTaskFiles(selectedLeaderTask).length > 0 && (
-                      <div className="space-y-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tệp đính kèm</h4>
+                        <span className="text-[10px] font-bold text-text-secondary">{leaderTaskAttachments.length} tệp</span>
+                      </div>
+
+                      {isLoadingLeaderTaskAttachments ? (
+                        <div className="flex items-center gap-2 rounded-lg border border-teams-border bg-white px-3 py-3 text-xs font-medium text-text-secondary">
+                          <Loader2 size={14} className="animate-spin text-teams-purple" />
+                          Đang tải tệp đính kèm...
+                        </div>
+                      ) : leaderTaskAttachmentsError ? (
+                        <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-3 text-xs font-semibold text-red-700">
+                          {leaderTaskAttachmentsError}
+                        </div>
+                      ) : leaderTaskAttachments.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-3 text-xs font-medium text-text-secondary">
+                          Không có tệp đính kèm
+                        </div>
+                      ) : (
                         <div className="grid gap-2">
-                          {getLeaderTaskFiles(selectedLeaderTask).map((file) => (
-                            <a key={file.id} href={file.file_url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-teams-border bg-white px-3 py-2">
-                              <span className="text-xs font-medium text-text-main truncate">{file.file_name}</span>
+                          {toDisplayFiles(leaderTaskAttachments).map((file) => (
+                            <a
+                              key={file.id}
+                              href={file.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center justify-between rounded-lg border border-teams-border bg-white px-3 py-2 hover:border-teams-purple hover:bg-teams-purple/5 transition-colors"
+                            >
+                              <span className="text-xs font-medium text-text-main truncate">{file.name}</span>
                               <FileText size={14} className="text-teams-purple" />
                             </a>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {getLeaderTaskHistory(selectedLeaderTask).length > 0 && (
                       <div className="space-y-2">
@@ -1179,7 +1291,7 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                                     File đính kèm
                                   </div>
                                   <div className="space-y-2">
-                                    {getAssignedTaskFiles(task).map((file) => (
+                                    {toDisplayFiles(getAssignedTaskFiles(task)).map((file) => (
                                       <a
                                         key={file.id}
                                         href={file.url}
@@ -1188,7 +1300,7 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                                         className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 transition-colors hover:bg-gray-100"
                                       >
                                         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-text-main">
-                                          {file.nameFile}
+                                          {file.name}
                                         </span>
                                         <FileText size={12} className="shrink-0 text-teams-purple" />
                                       </a>
@@ -1203,9 +1315,9 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                                     File đính kèm
                                   </div>
                                   <div className="space-y-2">
-                                    {task.attachments.map((file, index) => (
-                                      <div key={`${task.id}-${file}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-medium text-text-main">
-                                        {file}
+                                    {toDisplayFiles(task.attachments).map((file) => (
+                                      <div key={`${task.id}-${file.id}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-medium text-text-main">
+                                        {file.name}
                                       </div>
                                     ))}
                                   </div>
@@ -1222,10 +1334,51 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tệp đính kèm phân công</h4>
                       <div className="grid gap-2">
-                        {getAssignedTaskFiles(selectedTask).map((file) => (
-                          <div key={file.id} className="flex items-center justify-between rounded-lg border border-teams-border bg-white px-3 py-2">
-                            <span className="text-xs font-medium text-text-main truncate">{file.nameFile}</span>
+                        {toDisplayFiles(getAssignedTaskFiles(selectedTask)).map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between rounded-lg border border-teams-border bg-white px-3 py-2 hover:border-teams-purple hover:bg-teams-purple/5 transition-colors"
+                          >
+                            <span className="text-xs font-medium text-text-main truncate">{file.name}</span>
                             <span className="text-[10px] text-text-secondary">{file.createdAt ? formatDate(file.createdAt) : ''}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTask.document?.files && selectedTask.document.files.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tệp văn bản gốc</h4>
+                      <div className="grid gap-2">
+                        {toDisplayFiles(selectedTask.document.files).map((file) => (
+                          <a
+                            key={file.id}
+                            href={file.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between rounded-lg border border-teams-border bg-white px-3 py-2 hover:border-teams-purple hover:bg-teams-purple/5 transition-colors"
+                          >
+                            <span className="text-xs font-medium text-text-main truncate">{file.name}</span>
+                            <FileText size={14} className="text-teams-purple" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tên tệp đính kèm ({selectedTask.attachments.length})</h4>
+                      <div className="grid grid-cols-1 gap-2">
+                        {toDisplayFiles(selectedTask.attachments).map((file) => (
+                          <div key={file.id} className="flex items-center p-2 border border-teams-border rounded-md hover:bg-gray-50 transition-colors cursor-pointer group">
+                            <FileText size={14} className="text-teams-purple mr-2" />
+                            <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">{file.name}</span>
+                            <Plus size={12} className="text-gray-300 opacity-0 group-hover:opacity-100" />
                           </div>
                         ))}
                       </div>
@@ -1249,21 +1402,6 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                               </span>
                             </div>
                             <p className="text-[11px] text-text-secondary mt-1">{item.note || 'Không có ghi chú'}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedTask.attachments && selectedTask.attachments.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tệp đính kèm ({selectedTask.attachments.length})</h4>
-                      <div className="grid grid-cols-1 gap-2">
-                        {selectedTask.attachments.map((file, index) => (
-                          <div key={`${file}-${index}`} className="flex items-center p-2 border border-teams-border rounded-md hover:bg-gray-50 transition-colors cursor-pointer group">
-                            <FileText size={14} className="text-teams-purple mr-2" />
-                            <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">{file}</span>
-                            <Plus size={12} className="text-gray-300 opacity-0 group-hover:opacity-100" />
                           </div>
                         ))}
                       </div>
@@ -1471,10 +1609,26 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                     <input
                       type="datetime-local"
                       step="1"
+                      min={getLocalDateTimeInputValue(new Date())}
                       value={newTask.deadline}
-                      onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                      className="w-full p-3 bg-gray-50 border-2 border-transparent focus:border-teams-purple rounded-xl outline-none text-sm font-bold"
+                      onChange={(e) => {
+                        const nextDeadline = e.target.value;
+                        setNewTask({ ...newTask, deadline: nextDeadline });
+                        const nextError = validateAssignDeadline(nextDeadline);
+                        setAssignFieldErrors((current) => ({ ...current, deadline: nextError || undefined }));
+                        if (assignError && !nextError) {
+                          setAssignError('');
+                        }
+                      }}
+                      className={`w-full p-3 bg-gray-50 border-2 rounded-xl outline-none text-sm font-bold transition-colors ${
+                        assignFieldErrors.deadline
+                          ? 'border-red-300 focus:border-red-500'
+                          : 'border-transparent focus:border-teams-purple'
+                      }`}
                     />
+                    {assignFieldErrors.deadline && (
+                      <p className="text-[10px] font-semibold text-red-600">{assignFieldErrors.deadline}</p>
+                    )}
                   </div>
                 </div>
 
@@ -1482,10 +1636,10 @@ export const ManagerDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tệp liên quan (Document)</label>
                     <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto custom-scrollbar">
-                      {documentAttachments.map((att) => (
-                        <a key={att.id} href={att.file_url} target="_blank" rel="noreferrer" className="flex items-center p-2 border border-teams-border rounded-md hover:bg-gray-50 transition-colors">
+                      {toDisplayFiles(documentAttachments).map((att) => (
+                        <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="flex items-center p-2 border border-teams-border rounded-md hover:bg-gray-50 transition-colors">
                           <FileText size={14} className="text-teams-purple mr-2" />
-                          <span className="text-[11px] font-medium text-text-secondary truncate">{att.file_name}</span>
+                          <span className="text-[11px] font-medium text-text-secondary truncate">{att.name}</span>
                         </a>
                       ))}
                     </div>

@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
@@ -28,6 +28,7 @@ import { KPIStats, LeaderDeptPerformance } from '../../models/Stats';
 import { StatCard, StatusBadge } from '../common/SharedComponents';
 import { leaderService } from '../../service/leaderService';
 import { getDocumentFiles } from '../../service/clericalService';
+import { toDisplayFiles } from '../../utils/fileDisplay';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, AreaChart, Area } from 'recharts';
 
 export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
@@ -395,7 +396,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                                ) : (
                                   <div className="space-y-3">
                                      <p className="text-sm text-indigo-900/80 leading-relaxed font-medium">
-                                       "{selectedDoc.summary}"
+                                       "{selectedDoc.summary || selectedDoc.description || 'Chưa có tóm tắt nội dung.'}"
                                      </p>
                                      {selectedDoc.legalWarning && selectedDoc.legalWarning === true && (
                                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -418,7 +419,7 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                        <div className="space-y-3">
                           <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Nội dung chi tiết</h4>
                           <div className="p-4 bg-gray-50 border border-gray-100 rounded-lg text-sm text-text-main leading-relaxed shadow-inner">
-                            {selectedDoc.description || "Nội dung văn bản đang được cập nhật..."}
+                            {selectedDoc.summary || selectedDoc.description || "Nội dung văn bản đang được cập nhật..."}
                           </div>
                        </div>
 
@@ -441,10 +442,10 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                              </div>
                           ) : (
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                               {attachments.map((file) => (
+                               {toDisplayFiles(attachments).map((file) => (
                                  <a 
                                    key={file.id}
-                                   href={file.file_url}
+                                   href={file.url}
                                    target="_blank"
                                    rel="noopener noreferrer"
                                    className="flex items-center p-3 border border-teams-border rounded-lg hover:border-teams-purple cursor-pointer transition-all group hover:bg-gray-50 text-left"
@@ -453,8 +454,8 @@ export const LeaderDashboard: React.FC<{ user: User }> = ({ user }) => {
                                        <FileText size={18} />
                                     </div>
                                     <div className="flex-1 overflow-hidden">
-                                       <p className="text-xs font-bold text-text-main truncate group-hover:text-teams-purple transition-colors" title={file.file_name}>
-                                         {file.file_name}
+                                       <p className="text-xs font-bold text-text-main truncate group-hover:text-teams-purple transition-colors" title={file.name}>
+                                         {file.name}
                                        </p>
                                        <p className="text-[10px] text-gray-400 truncate">Nhấn để xem / tải về</p>
                                     </div>

@@ -34,6 +34,7 @@ export const ENDPOINTS = {
     ADD: '/api/document/add',
     UPDATE_STATUS: '/api/document/status-approve',
     SUBMIT_TO_LEADER: '/api/document/submit-to-leader',
+    SEAL: '/api/document/:id/seal',
     DELETE: '/api/document/delete',
     FILES: '/api/document/files',
     FLOW_HISTORY: '/api/documents/:documentId/flow-history',
