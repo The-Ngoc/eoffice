@@ -116,6 +116,23 @@ export const updateStatus = async (
   };
 };
 
+export const sealDocument = async (
+  id: string,
+): Promise<ApiResponse<{ document: ClericalDocument; sealedFile?: DocumentFile }>> => {
+  const response = await axiosClient.post(
+    ENDPOINTS.DOCUMENTS.SEAL.replace(':id', encodeURIComponent(id)),
+  );
+  const payload = response.data as ApiResponse<{ document: ClericalDocumentDto; sealedFile?: DocumentFile }>;
+
+  return {
+    ...payload,
+    data: {
+      document: mapClericalDocumentDto(payload.data.document),
+      sealedFile: payload.data.sealedFile,
+    },
+  };
+};
+
 // Delete one document by id.
 export const deleteDocument = async (id: string): Promise<ApiResponse<null>> => {
   const response = await axiosClient.post(ENDPOINTS.DOCUMENTS.DELETE, { id });
@@ -125,7 +142,9 @@ export const deleteDocument = async (id: string): Promise<ApiResponse<null>> => 
 // Fetch document files by document id
 export const getDocumentFiles = async (id: string): Promise<DocumentFile[]> => {
   const response = await axiosClient.get(`${ENDPOINTS.DOCUMENTS.FILES}/${id}`);
-  return response.data as DocumentFile[];
+  const payload = response.data as DocumentFile[] | ApiResponse<DocumentFile[]>;
+
+  return Array.isArray(payload) ? payload : (payload.data ?? []);
 };
 
 // Fetch flow history by document id

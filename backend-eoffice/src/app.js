@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const userRoutes = require('./routes/userRouter');
 const documentRoutes = require('./routes/documentRouter');
@@ -19,6 +20,14 @@ app.disable('x-powered-by');
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.toLowerCase().endsWith('.pdf')) {
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', 'inline');
+        }
+    }
+}));
 
 // Health check for deployment platforms like Render
 app.get('/health', (req, res) => {

@@ -1,4 +1,4 @@
-
+﻿
 export type ClericalDocumentStatus =
   | 'INITIALIZED'
   | 'WAITING_LEADER'
@@ -28,6 +28,7 @@ export interface ClericalFlowStepDto {
 export interface ClericalDocumentDto {
   id: string | number;
   docNumber?: string;
+  documentNumber?: string;
   symbol?: string;
   title?: string;
   sender?: string;
@@ -177,7 +178,7 @@ export const mapFlowStepDto = (flowStep: ClericalFlowStepDto, index: number): Cl
 export const mapClericalDocumentDto = (document: ClericalDocumentDto): ClericalDocument => {
   return {
     id: String(document.id),
-    docNumber: document.docNumber ?? '',
+    docNumber: document.docNumber ?? document.documentNumber ?? '',
     symbol: document.symbol ?? '',
     title: document.title ?? 'Chưa có tiêu đề',
     sender: document.sender ?? 'Chưa rõ đơn vị gửi',

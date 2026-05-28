@@ -13,7 +13,7 @@ const router = express.Router();
  */
 router.get(
     '/tasks',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST, ROLES.CLERICAL]),
     taskController.getAllTasks
 );
 
@@ -23,7 +23,7 @@ router.get(
  */
 router.get(
     '/tasks/:taskId',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST, ROLES.CLERICAL]),
     taskController.getTaskById
 );
 
@@ -45,8 +45,8 @@ router.get(
  */
 router.post(
     '/new-task',
+    checkRole([ROLES.MANAGER, ROLES.LEADER]),
     uploadDocumentFile.array('files'),
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER]), */ 
     taskController.createTask
 );
 
@@ -57,7 +57,7 @@ router.post(
  */
 router.patch(
     '/tasks/:taskId',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]),
     taskController.updateTask
 );
 
@@ -67,7 +67,7 @@ router.patch(
  */
 router.delete(
     '/tasks/:taskId',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER]),
     taskController.deleteTask
 );
 
@@ -78,7 +78,7 @@ router.delete(
  */
 router.get(
     '/tasks/member/:memberId',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]),
     taskController.getTasksByMemberId
 );
 

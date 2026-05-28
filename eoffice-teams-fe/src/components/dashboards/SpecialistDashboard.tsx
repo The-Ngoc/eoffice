@@ -28,6 +28,7 @@ import { TaskModel } from '../../models/Task';
 import { Meeting, ChatMessage } from '../../models/Communication';
 import { StatCard, ToolCard, InteractiveProgressBar } from '../common/SharedComponents';
 import { specialistService } from '../../service/specialService';
+import { toDisplayFiles } from '../../utils/fileDisplay';
 
 export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [tasks, setTasks] = useState<TaskModel[]>([]);
@@ -50,6 +51,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
   const notesRef = useRef<HTMLDivElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [taskMessage, setTaskMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -97,6 +99,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
   const openTask = async (task: TaskModel) => {
     setSelectedTask(task);
     setIsTaskLoading(true);
+    setTaskMessage(null);
     try {
       clearSubmissionDraft();
       await refreshSelectedTask(task.id);
@@ -164,9 +167,11 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
         setDailyLog('');
         await loadData();
         await refreshSelectedTask(selectedTask.id);
+        setTaskMessage({ type: 'success', text: `Đã cập nhật tiến độ lên ${progress}%.` });
       }
     } catch (err) {
       console.error('Failed to update progress', err);
+      setTaskMessage({ type: 'error', text: 'Không thể cập nhật tiến độ. Vui lòng thử lại.' });
     } finally {
       setIsUpdatingProgress(false);
     }
@@ -197,9 +202,14 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
         clearSubmissionDraft();
         await loadData();
         await refreshSelectedTask(selectedTask.id);
+        setTaskMessage({
+          type: 'success',
+          text: isResubmit ? 'Đã gửi lại task cho Manager duyệt.' : 'Đã submit task cho Manager duyệt.',
+        });
       }
     } catch (err) {
       console.error('Failed to submit task', err);
+      setTaskMessage({ type: 'error', text: 'Không thể submit task. Vui lòng thử lại.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -457,6 +467,18 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                               </div>
                             )}
 
+                            {taskMessage && (
+                              <div
+                                className={`p-4 rounded-2xl border text-xs font-bold ${
+                                  taskMessage.type === 'success'
+                                    ? 'bg-green-50 border-green-200 text-green-700'
+                                    : 'bg-red-50 border-red-200 text-red-700'
+                                }`}
+                              >
+                                {taskMessage.text}
+                              </div>
+                            )}
+
                             <section className="space-y-3">
                               <div className="flex items-center justify-between">
                                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Thông tin chung</h3>
@@ -503,7 +525,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                       <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.symbol || 'N/A'}</div>
                                     </div>
                                     <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                      <div className="text-[9px] font-black text-gray-400 uppercase">Nguồn gửi</div>
+                                      <div className="text-[9px] font-black text-gray-400 uppercase">Đơn vị gửi</div>
                                       <div className="text-xs font-bold text-text-main mt-1">{selectedTask.document.sender || 'N/A'}</div>
                                     </div>
                                     <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
@@ -516,15 +538,15 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                     <div className="text-[9px] font-black text-gray-400 uppercase">Tệp đính kèm văn bản</div>
                                     {(selectedTask.document.files || []).length > 0 ? (
                                       <div className="space-y-2">
-                                        {selectedTask.document.files!.map((file) => (
+                                        {toDisplayFiles(selectedTask.document.files).map((file) => (
                                           <a
                                             key={file.id}
-                                            href={file.file_url}
+                                            href={file.url}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:border-teams-purple/30 transition-all"
                                           >
-                                            <span className="text-xs font-bold text-text-main truncate">{file.file_name}</span>
+                                            <span className="text-xs font-bold text-text-main truncate">{file.name}</span>
                                             <span className="text-[10px] font-black text-teams-purple">Mở</span>
                                           </a>
                                         ))}
@@ -533,6 +555,26 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                       <div className="text-xs text-gray-400 italic">Chưa có file đính kèm.</div>
                                     )}
                                   </div>
+                                </div>
+                              </section>
+                            )}
+
+                            {(selectedTask.files || []).length > 0 && !['UnderReview', 'Rejected', 'Completed', 'Done'].includes(selectedTask.status) && (
+                              <section className="space-y-3">
+                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tệp đính kèm task</h3>
+                                <div className="space-y-2">
+                                  {toDisplayFiles(selectedTask.files).map((f) => (
+                                    <a
+                                      key={f.id}
+                                      className="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg hover:border-teams-purple/30 transition-all"
+                                      href={f.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      <span className="text-xs font-bold text-text-main truncate">{f.name}</span>
+                                      <span className="text-[10px] font-black text-teams-purple">Mở</span>
+                                    </a>
+                                  ))}
                                 </div>
                               </section>
                             )}
@@ -615,6 +657,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
 
                                   {submissionFiles.length > 0 && (
                                     <div className="mt-4 space-y-2">
+                                      <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">File sẽ nộp</div>
                                       {submissionFiles.map((f, idx) => (
                                         <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 border border-gray-100 rounded-lg">
                                           <div className="text-xs font-bold text-text-main truncate">{f.name}</div>
@@ -628,12 +671,12 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                                   )}
                                 </div>
 
-                                {(selectedTask.files || []).length > 0 && (
+                                {(selectedTask.files || []).length > 0 && ['UnderReview', 'Rejected', 'Completed', 'Done'].includes(selectedTask.status) && (
                                   <div className="space-y-2">
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">File đã nộp</div>
-                                    {(selectedTask.files || []).map((f) => (
+                                    {toDisplayFiles(selectedTask.files).map((f) => (
                                       <div key={f.id} className="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg">
-                                        <a className="text-xs font-bold text-teams-purple truncate" href={f.url} target="_blank" rel="noreferrer">{f.nameFile}</a>
+                                        <a className="text-xs font-bold text-teams-purple truncate" href={f.url} target="_blank" rel="noreferrer">{f.name}</a>
                                         <button
                                           onClick={() => handleDeleteExistingFile(f.id)}
                                           className="text-[10px] font-black text-red-600"
@@ -662,29 +705,7 @@ export const SpecialistDashboard: React.FC<{ user: User }> = ({ user }) => {
                               </section>
                             )}
                          </div>
-                         {/* Context & Discussion (Sidebar) */}
                          <div className="md:col-span-5 space-y-6">
-                            <section className="space-y-3">
-                               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bối cảnh chỉ đạo</h3>
-                               <div className="space-y-3 relative before:absolute before:left-2.75 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
-                                  {[
-                                    { role: 'Giám đốc', text: 'Cần dự thảo sớm để trình ký.', time: '2h trước' },
-                                    { role: 'Trưởng phòng', text: 'Lưu ý phần ngân sách.', time: '1h trước' }
-                                  ].map((node, i) => (
-                                    <div key={i} className="flex gap-4 relative">
-                                      <div className="w-6 h-6 rounded-full bg-white border-2 border-teams-purple flex items-center justify-center z-10">
-                                        <div className="w-2 h-2 bg-teams-purple rounded-full" />
-                                      </div>
-                                      <div className="space-y-0.5">
-                                        <p className="text-[10px] font-black text-text-main">{node.role}</p>
-                                        <p className="text-[10px] text-text-secondary italic">"{node.text}"</p>
-                                        <p className="text-[8px] text-gray-400 uppercase font-bold">{node.time}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                               </div>
-                            </section>
-
                             <section className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-4">
                                <div className="flex items-center justify-between">
                                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">

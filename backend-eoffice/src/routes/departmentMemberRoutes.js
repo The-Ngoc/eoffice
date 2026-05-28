@@ -11,7 +11,7 @@ const router = express.Router();
  */
 router.get(
     '/departments/:departmentId/members',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER]),
     departmentMemberController.getMembersByDepartmentId
 );
 
@@ -21,7 +21,7 @@ router.get(
  */
 router.get(
     '/members/:memberId',
-    /* checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]), */ 
+    checkRole([ROLES.MANAGER, ROLES.LEADER, ROLES.SPECIALIST]),
     departmentMemberController.getMemberById
 );
 
@@ -32,7 +32,7 @@ router.get(
  */
 router.post(
     '/departments/:departmentId/members',
-    /* checkRole([ROLES.MANAGER]), */ 
+    checkRole([ROLES.MANAGER]),
     departmentMemberController.addMemberToDepartment
 );
 
@@ -42,7 +42,7 @@ router.post(
  */
 router.delete(
     '/members/:memberId',
-    /* checkRole([ROLES.MANAGER]), */ 
+    checkRole([ROLES.MANAGER]),
     departmentMemberController.removeMemberFromDepartment
 );
 

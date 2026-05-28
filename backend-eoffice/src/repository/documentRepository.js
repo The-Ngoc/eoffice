@@ -70,6 +70,7 @@ async function countDocumentsByStatus() {
         [DOCUMENT_STATUS.ASSIGNED]: 0,
         [DOCUMENT_STATUS.PROCESSING]: 0,
         [DOCUMENT_STATUS.COMPLETED]: 0,
+        [DOCUMENT_STATUS.PUBLISHED]: 0,
         [DOCUMENT_STATUS.REJECTED]: 0,
         total: 0
     };

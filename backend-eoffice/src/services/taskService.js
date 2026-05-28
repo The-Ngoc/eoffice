@@ -18,6 +18,23 @@ function normalizeRecord(record) {
     return record?.get ? record.get({ plain: true }) : record;
 }
 
+function validateFutureDueDate(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        throw createError('Thời hạn xử lý không hợp lệ', 400);
+    }
+
+    if (parsed.getTime() <= Date.now()) {
+        throw createError('Không được phân công task ở thời gian quá khứ', 400);
+    }
+
+    return parsed;
+}
+
 /**
  * Lấy tất cả Task
  * @param {Object} query - { status, priority, memberId, page, limit }
@@ -77,6 +94,7 @@ async function createNewTask(data, files = []) {
         throw createError(`Độ ưu tiên không hợp lệ. Các giá trị cho phép: ${Object.values(PRIORITY).join(', ')}`, 400);
     }
 
+    const dueDate = validateFutureDueDate(data.dueDate);
     const transaction = await sequelize.transaction();
     const uploadedAssets = [];
 
@@ -89,7 +107,7 @@ async function createNewTask(data, files = []) {
             description: data.description || null,
             status: data.status || TASK_STATUS.TODO,
             priority: data.priority || PRIORITY.MEDIUM,
-            dueDate: data.dueDate || null,
+            dueDate,
             progress: data.progress || 0,
             note: data.note || null
         }, { transaction });
@@ -177,7 +195,7 @@ async function updateExistingTask(taskId, data) {
     if (data.status !== undefined) updateData.status = data.status;
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.progress !== undefined) updateData.progress = data.progress;
-    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
+    if (data.dueDate !== undefined) updateData.dueDate = validateFutureDueDate(data.dueDate);
     if (data.note !== undefined) updateData.note = data.note;
     if (data.rejectionReason !== undefined) updateData.rejectionReason = data.rejectionReason;
 

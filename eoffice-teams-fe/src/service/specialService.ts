@@ -23,7 +23,7 @@ interface BackendTaskDto {
   createdAt: string;
   progress?: number;
   rejectionReason?: string | null;
-  assigner?: { fullName?: string | null } | null;
+  assigner?: { id?: string | null; fullName?: string | null; email?: string | null; role?: string | null } | null;
   files?: Array<{ id: string; nameFile: string; url: string; createdAt?: string }>;
   document?: {
     id: string;
@@ -72,6 +72,14 @@ const mapBackendTask = (task: BackendTaskDto): TaskModel => ({
   createdAt: task.createdAt,
   progress: typeof task.progress === 'number' ? task.progress : undefined,
   rejectionReason: task.rejectionReason ?? null,
+  assigner: task.assigner?.id && task.assigner?.role
+    ? {
+        id: task.assigner.id,
+        fullName: task.assigner.fullName ?? 'N/A',
+        email: task.assigner.email ?? undefined,
+        role: task.assigner.role as any,
+      }
+    : undefined,
   files: task.files ?? [],
   document: task.document
     ? {

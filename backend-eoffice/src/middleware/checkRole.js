@@ -11,17 +11,32 @@ const ROLE_ALIASES = {
     staff: ROLES.SPECIALIST
 };
 
+function canBypassRoleCheck() {
+    return process.env.NODE_ENV !== 'production' || process.env.AUTH_DEV_BYPASS === 'true';
+}
+
 function getRequestRole(req) {
-    return req.user?.role || req.headers['x-user-role'] || req.headers['x-role'] || req.headers.role;
+    if (req.user?.role) {
+        return req.user.role;
+    }
+
+    if (!canBypassRoleCheck()) {
+        return null;
+    }
+
+    return req.headers['x-user-role'] || req.headers['x-role'] || req.headers.role;
 }
 
 function getRequestUserId(req) {
-    return req.user?.id
-        || req.headers['x-user-id']
-        || req.headers['user-id']
-        || req.query?.userId
-        || req.body?.userId
-        || null;
+    if (req.user?.id) {
+        return req.user.id;
+    }
+
+    if (!canBypassRoleCheck()) {
+        return null;
+    }
+
+    return req.headers['x-user-id'] || req.headers['user-id'] || req.query?.userId || req.body?.userId || null;
 }
 
 function normalizeRole(role) {
@@ -54,10 +69,6 @@ async function resolveRoleFromUserId(req) {
     req.user.role = user.role;
 
     return user.role;
-}
-
-function canBypassRoleCheck() {
-    return process.env.NODE_ENV !== 'production' || process.env.AUTH_DEV_BYPASS === 'true';
 }
 
 function checkRole(allowedRoles = []) {

@@ -63,6 +63,22 @@ exports.updateDocumentApprove = async (req, res) => {
     }
 };
 
+exports.sealDocument = async (req, res) => {
+    try {
+        const actor = {
+            id: req.user?.id || req.headers['x-user-id'] || req.headers['user-id'] || null,
+            role: req.user?.role || req.headers['x-user-role'] || 'CLERICAL',
+            departmentId: req.user?.departmentId || req.headers['x-department-id'] || null
+        };
+
+        const result = await documentService.sealDocument(req.params.id, actor);
+        return sendSuccess(res, result, 'Đóng dấu và ban hành văn bản thành công');
+    } catch (error) {
+        console.error('❌ Lỗi khi đóng dấu văn bản:', error);
+        return sendError(res, error);
+    }
+};
+
 exports.submitToLeader = async (req, res) => {
     try {
         const actor = {

@@ -2,6 +2,7 @@ const Task = require('../models/taskModel');
 const TaskFile = require('../models/taskFileModel');
 const DepartmentMember = require('../models/departmentMemberModel');
 const Document = require('../models/documentModel');
+const DocumentFile = require('../models/documentFileModel');
 const User = require('../models/userModel');
 
 async function findMemberByUserId(userId) {
@@ -16,7 +17,12 @@ async function findTasksByMemberId(memberId) {
         where: { memberId },
         include: [
             { model: User, as: 'assigner', attributes: ['id', 'fullName', 'email', 'role'] },
-            { model: Document, as: 'document', attributes: ['id', 'documentNumber', 'title'] }
+            {
+                model: Document,
+                as: 'document',
+                attributes: ['id', 'documentNumber', 'symbol', 'title', 'sender', 'type', 'summary', 'status', 'priority', 'urgency', 'createdAt'],
+                include: [{ model: DocumentFile, as: 'files', attributes: ['id', 'nameFile', 'url', 'createdAt'] }]
+            }
         ],
         order: [['createdAt', 'DESC']]
     });
@@ -34,7 +40,12 @@ async function findTaskDetail(taskId) {
                 attributes: ['id', 'departmentId', 'userId'],
                 include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'role'] }]
             },
-            { model: Document, as: 'document', attributes: ['id', 'documentNumber', 'title'] },
+            {
+                model: Document,
+                as: 'document',
+                attributes: ['id', 'documentNumber', 'symbol', 'title', 'sender', 'type', 'summary', 'status', 'priority', 'urgency', 'createdAt'],
+                include: [{ model: DocumentFile, as: 'files', attributes: ['id', 'nameFile', 'url', 'createdAt'] }]
+            },
             { model: TaskFile, as: 'files', attributes: ['id', 'nameFile', 'url', 'createdAt'] },
 
         ]
